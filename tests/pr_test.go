@@ -32,6 +32,7 @@ var ignoreDestroys = []string{
 	"module.check_node_status.null_resource.remote_exec[1]",
 	"module.landing_zone_vsi.module.wait_management_candidate_vsi_booted.null_resource.remote_exec[0]",
 	"module.check_cluster_status.null_resource.remote_exec[0]",
+	"module.file_storage.ibm_is_share.share[0]",
 	"module.landing_zone_vsi.module.hpc.module.landing_zone_vsi.module.wait_management_candidate_vsi_booted.null_resource.remote_exec[0]",
 	"module.landing_zone_vsi.module.hpc.module.landing_zone_vsi.module.wait_management_vsi_booted.null_resource.remote_exec[0]",
 	"module.landing_zone_vsi.module.do_management_vsi_configuration.null_resource.remote_exec_script_cp_files[1]",
@@ -263,16 +264,19 @@ func TestMain(m *testing.M) {
 	exitCode := m.Run()
 
 	// Report results
-	results, err := utils.ParseJSONFile("test_output.json")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+	jsonFileName, ok := os.LookupEnv("LOG_FILE_NAME")
+	if ok {
+		results, err := utils.ParseJSONFile(jsonFileName)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		err = utils.GenerateHTMLReport(results)
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
 	}
 
-	err = utils.GenerateHTMLReport(results)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
 	// Exit with the result of the tests
 	os.Exit(exitCode)
 

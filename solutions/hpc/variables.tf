@@ -45,6 +45,16 @@ variable "cluster_prefix" {
   }
 }
 
+variable "solution" {
+  type        = string
+  default     = "lsf"
+  description = "Provide the value for the solution that is needed for the support of lsf and HPC"
+  validation {
+    condition     = contains(["hpc", "lsf"], var.solution)
+    error_message = "supported values are only lsf for BYOL and HPC"
+  }
+}
+
 variable "zones" {
   description = "The IBM Cloud zone name within the selected region where the IBM Cloud HPC cluster should be deployed and requires a single zone input value. Supported zones are: eu-de-2 and eu-de-3 for eu-de, us-east-1 and us-east-3 for us-east, and us-south-1 for us-south. The management nodes, file storage shares, and compute nodes will be deployed in the same zone.[Learn more](https://cloud.ibm.com/docs/vpc?topic=vpc-creating-a-vpc-in-a-different-region#get-zones-using-the-cli)."
   type        = list(string)
@@ -67,13 +77,16 @@ variable "cluster_id" {
 variable "reservation_id" {
   type        = string
   sensitive   = true
+  default     = null
   description = "Ensure that you have received the reservation ID from IBM technical sales. Reservation ID is a unique identifier to distinguish different IBM Cloud HPC service agreements. It must start with a letter and can only contain letters, numbers, hyphens (-), or underscores (_)."
-  validation {
-    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-_]*$", var.reservation_id))
-    error_message = "Reservation ID must start with a letter and can only contain letters, numbers, hyphens (-), or underscores (_)."
-  }
 }
 
+variable "ibm_customer_number" {
+  type        = string
+  sensitive   = true
+  default     = null
+  description = "Comma-separated list of the IBM Customer Number(s) (ICN) that is used for the Bring Your Own License (BYOL) entitlement check. For more information on how to find your ICN, see [What is my IBM Customer Number (ICN)?](https://www.ibm.com/support/pages/what-my-ibm-customer-number-icn)."
+}
 ##############################################################################
 # VPC Variables
 ##############################################################################
@@ -174,22 +187,23 @@ variable "login_node_instance_type" {
     error_message = "The profile must be a valid profile name."
   }
 }
+
 variable "management_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-v11"
+  default     = "hpcaas-lsf10-rhel810-v12"
   description = "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster management nodes. By default, the solution uses a RHEL88 base image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
 
 }
 
 variable "compute_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-compute-v7"
-  description = "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster dynamic compute nodes. By default, the solution uses a RHEL 8-8 base OS image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). The solution also offers, Ubuntu 22-04 OS base image (hpcaas-lsf10-ubuntu2204-compute-v7). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
+  default     = "hpcaas-lsf10-rhel810-compute-v8"
+  description = "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster dynamic compute nodes. By default, the solution uses a RHEL 8-8 base OS image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). The solution also offers, Ubuntu 22-04 OS base image (hpcaas-lsf10-ubuntu2204-compute-v8). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
 }
 
 variable "login_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-compute-v7"
+  default     = "hpcaas-lsf10-rhel810-compute-v8"
   description = "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster login node. By default, the solution uses a RHEL 8-8 OS image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). The solution also offers, Ubuntu 22-04 OS base image (hpcaas-lsf10-ubuntu2204-compute-v7). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
 }
 
@@ -210,6 +224,38 @@ variable "management_node_count" {
   validation {
     condition     = 1 <= var.management_node_count && var.management_node_count <= 10
     error_message = "Input \"management_node_count\" must be must be greater than or equal to 1 and less than or equal to 10."
+  }
+}
+
+variable "worker_node_min_count" {
+  type        = number
+  default     = 0
+  description = "The minimum number of worker nodes. This is the number of static worker nodes that will be provisioned at the time the cluster is created. If using NFS storage, enter a value in the range 0 - 500. If using Spectrum Scale storage, enter a value in the range 1 - 64. NOTE: Spectrum Scale requires a minimum of 3 compute nodes (combination of management-host, management-host-candidate, and worker nodes) to establish a [quorum](https://www.ibm.com/docs/en/spectrum-scale/5.1.5?topic=failure-quorum#nodequo) and maintain data consistency in the event of a node failure. Therefore, the minimum value of 1 may need to be larger if the value specified for management_node_count is less than 2."
+  validation {
+    condition     = 0 <= var.worker_node_min_count && var.worker_node_min_count <= 500
+    error_message = "Input \"worker_node_min_count\" must be >= 0 and <= 500."
+  }
+}
+
+variable "worker_node_instance_type" {
+  type        = string
+  default     = "bx2-4x16"
+  description = "Specify the virtual server instance profile type name to be used to create the worker nodes for the Spectrum LSF cluster. The worker nodes are the ones where the workload execution takes place and the choice should be made according to the characteristic of workloads. For choices on profile types, see [Instance Profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles&interface=ui). Note: If dedicated_host_enabled == true, available instance prefix (e.g., bx2 and cx2) can be limited depending on your target region. Check `ibmcloud target -r {region_name}; ibmcloud is dedicated-host-profiles."
+  validation {
+    # regex(...) fails if it cannot find a match
+    condition     = can(regex("^[^\\s]+-[0-9]+x[0-9]+", var.worker_node_instance_type))
+    error_message = "The profile must be a valid profile name."
+  }
+}
+
+
+variable "worker_node_max_count" {
+  type        = number
+  default     = 10
+  description = "The maximum number of worker nodes that can be deployed in the Spectrum LSF cluster. In order to use the [Resource Connector](https://www.ibm.com/docs/en/spectrum-lsf/10.1.0?topic=lsf-resource-connnector) feature to dynamically create and delete worker nodes based on workload demand, the value selected for this parameter must be larger than worker_node_min_count. If you plan to deploy only static worker nodes in the LSF cluster, e.g., when using Spectrum Scale storage, the value for this parameter should be equal to worker_node_min_count. Enter a value in the range 1 - 500."
+  validation {
+    condition     = 1 <= var.worker_node_max_count && var.worker_node_max_count <= 500
+    error_message = "Input \"worker_node_max_count must\" be >= 1 and <= 500."
   }
 }
 
@@ -290,13 +336,23 @@ variable "enable_cos_integration" {
 variable "cos_instance_name" {
   type        = string
   default     = null
-  description = "Provide the name of the existing cos instance to store vpc flow logs."
+  description = "Provide the name of the existing COS instance where the logs for the enabled functionalities will be stored."
 }
 
-variable "observability_atracker_on_cos_enable" {
+variable "observability_atracker_enable" {
   type        = bool
   default     = true
-  description = "Enable Activity tracker service instance connected to Cloud Object Storage (COS). All the events will be stored in COS so customers can retrieve or ingest them in their system. While multiple Activity Tracker instances can be created, only one tracker is needed to capture all events. Creating additional trackers is unnecessary if an existing Activity Tracker is already integrated with a COS bucket. In such cases, set the value to false, as all events can be monitored and accessed through the existing Activity Tracker."
+  description = "Activity Tracker Event Routing to configure how to route auditing events. While multiple Activity Tracker instances can be created, only one tracker is needed to capture all events. Creating additional trackers is unnecessary if an existing Activity Tracker is already integrated with a COS bucket. In such cases, set the value to false, as all events can be monitored and accessed through the existing Activity Tracker."
+}
+
+variable "observability_atracker_target_type" {
+  type        = string
+  default     = "cloudlogs"
+  description = "All the events will be stored in either COS bucket or Cloud Logs on the basis of user input, so customers can retrieve or ingest them in their system."
+  validation {
+    condition     = contains(["cloudlogs", "cos"], var.observability_atracker_target_type)
+    error_message = "Allowed values for atracker target type is cloudlogs and cos."
+  }
 }
 
 variable "enable_vpc_flow_logs" {
@@ -315,6 +371,40 @@ variable "observability_monitoring_enable" {
   description = "Set false to disable IBM Cloud Monitoring integration. If enabled, infrastructure and LSF application metrics from Management Nodes will be ingested."
   type        = bool
   default     = false
+}
+
+variable "observability_logs_enable_for_management" {
+  description = "Set false to disable IBM Cloud Logs integration. If enabled, infrastructure and LSF application logs from Management Nodes will be ingested."
+  type        = bool
+  default     = false
+}
+
+variable "observability_logs_enable_for_compute" {
+  description = "Set false to disable IBM Cloud Logs integration. If enabled, infrastructure and LSF application logs from Compute Nodes will be ingested."
+  type        = bool
+  default     = false
+}
+
+variable "observability_enable_platform_logs" {
+  description = "Setting this to true will create a tenant in the same region that the Cloud Logs instance is provisioned to enable platform logs for that region. NOTE: You can only have 1 tenant per region in an account."
+  type        = bool
+  default     = false
+}
+
+variable "observability_enable_platform_metrics" {
+  description = "Receive platform metrics in the provisioned IBM Cloud Monitoring instance."
+  type        = bool
+  default     = false
+}
+
+variable "observability_logs_retention_period" {
+  description = "The number of days IBM Cloud Logs will retain the logs data in Priority insights. Allowed values: 7, 14, 30, 60, 90."
+  type        = number
+  default     = 7
+  validation {
+    condition     = contains([7, 14, 30, 60, 90], var.observability_logs_retention_period)
+    error_message = "Allowed values for cloud logs retention period is 7, 14, 30, 60, 90."
+  }
 }
 
 variable "observability_monitoring_on_compute_nodes_enable" {
@@ -517,6 +607,12 @@ variable "skip_iam_share_authorization_policy" {
   type        = bool
   default     = false
   description = "Set it to false if authorization policy is required for VPC file share to access kms. This can be set to true if authorization policy already exists. For more information on how to create authorization policy manually, see [creating authorization policies for VPC file share](https://cloud.ibm.com/docs/vpc?topic=vpc-file-s2s-auth&interface=ui)."
+}
+
+variable "skip_flowlogs_s2s_auth_policy" {
+  type        = bool
+  default     = false
+  description = "Skip auth policy between flow logs service and COS instance, set to true if this policy is already in place on account."
 }
 
 ###########################################################################

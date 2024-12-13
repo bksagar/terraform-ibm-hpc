@@ -160,3 +160,15 @@ variable "no_addr_prefix" {
   type        = bool
   description = "Set it as true, if you don't want to create address prefixes."
 }
+
+variable "observability_logs_enable" {
+  description = "Set false to disable IBM Cloud Logs integration. If enabled, infrastructure and LSF application logs from Management/Compute Nodes will be ingested under COS bucket."
+  type        = bool
+  default     = false
+}
+
+variable "skip_flowlogs_s2s_auth_policy" {
+  type        = bool
+  default     = false
+  description = "Skip auth policy between flow logs service and COS instance, set to true if this policy is already in place on account."
+}

@@ -46,6 +46,15 @@ else
   echo "Provided OS distribution not match, provide either RHEL or Ubuntu" >> $logfile
 fi
 
+echo "${cluster_public_key_content}" >> "${lsfadmin_ssh_dir}/authorized_keys"
+echo "${cluster_private_key_content}" >> "${lsfadmin_ssh_dir}/id_rsa"
+echo "StrictHostKeyChecking no" >> "${lsfadmin_ssh_dir}/config"
+chmod 600 "${lsfadmin_ssh_dir}/authorized_keys"
+chmod 600 "${lsfadmin_ssh_dir}/id_rsa"
+chmod 700 ${lsfadmin_ssh_dir}
+chown -R lsfadmin:lsfadmin ${lsfadmin_ssh_dir}
+echo "SSH key setup for lsfadmin user is completed" >> $logfile
+
 # Setup Network configuration
 # Change the MTU setting as this is required for setting mtu as 9000 for communication to happen between clusters
 if grep -q "NAME=\"Red Hat Enterprise Linux\"" /etc/os-release; then
@@ -75,16 +84,6 @@ elif grep -q "NAME=\"Ubuntu\"" /etc/os-release; then
         echo "MTU entry already exists in Netplan. Skipping."
     fi
 fi
-
-echo "${cluster_public_key_content}" >> "${lsfadmin_ssh_dir}/authorized_keys"
-echo "${cluster_private_key_content}" >> "${lsfadmin_ssh_dir}/id_rsa"
-echo "StrictHostKeyChecking no" >> "${lsfadmin_ssh_dir}/config"
-chmod 600 "${lsfadmin_ssh_dir}/authorized_keys"
-chmod 600 "${lsfadmin_ssh_dir}/id_rsa"
-chmod 700 ${lsfadmin_ssh_dir}
-chown -R lsfadmin:lsfadmin ${lsfadmin_ssh_dir}
-echo "SSH key setup for lsfadmin user is completed" >> $logfile
-
 
 # Setup root user
 root_ssh_dir="/root/.ssh"
@@ -193,13 +192,6 @@ sleep 30
 # Display the contents of /etc/resolv.conf before changes
 echo "Contents of /etc/resolv.conf before changes:"
 cat /etc/resolv.conf
-
-# Restart the NetworkManager service
-sudo systemctl restart NetworkManager
-
-# Toggle networking off and on using nmcli
-sudo nmcli networking off
-sudo nmcli networking on
 
 # Display the updated contents of /etc/resolv.conf
 echo "Contents of /etc/resolv.conf after changes:" >> $logfile

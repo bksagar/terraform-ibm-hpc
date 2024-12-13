@@ -293,100 +293,107 @@ func VerifyFileShareEncryption(t *testing.T, apiKey, region, resourceGroup, clus
 	utils.LogVerificationResult(t, encryptErr, "encryption", logger)
 }
 
-// VerifyManagementNodeLDAPConfig verifies the configuration of a management node by performing various checks.
-// It checks LDAP configuration, LSF commands, Run tasks, file mount, and SSH into all management nodes as an LDAP user.
-// The results of the checks are logged using the provided logger.
+// VerifyManagementNodeLDAPConfig performs various checks on a management node's LDAP configuration.
+// It verifies the LDAP configuration, checks the SSSD service, mounts files, runs jobs, and SSHs into nodes.
+// The results of each check are logged with the provided logger.
 func VerifyManagementNodeLDAPConfig(
 	t *testing.T,
 	sshMgmtClient *ssh.Client,
-	bastionIP string,
-	ldapServerIP string,
+	bastionIP, ldapServerIP string,
 	managementNodeIPList []string,
-	jobCommand string,
-	ldapDomainName string,
-	ldapUserName string,
-	ldapPassword string,
+	jobCommand, ldapDomainName, ldapUserName, ldapPassword string,
 	logger *utils.AggregatedLogger,
 ) {
 	// Verify LDAP configuration
-	ldapErr := VerifyLDAPConfig(t, sshMgmtClient, "management", ldapServerIP, ldapDomainName, ldapUserName, logger)
-	if ldapErr != nil {
-		utils.LogVerificationResult(t, ldapErr, "ldap configuration verification failed", logger)
+	if err := VerifyLDAPConfig(t, sshMgmtClient, "management", ldapServerIP, ldapDomainName, ldapUserName, logger); err != nil {
+		utils.LogVerificationResult(t, err, "LDAP configuration verification failed", logger)
 		return
 	}
 
-	// Connect to the master node via SSH and handle connection errors
-	sshLdapClient, connectionErr := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, managementNodeIPList[0], ldapUserName, ldapPassword)
-	if connectionErr != nil {
-		utils.LogVerificationResult(t, connectionErr, "connect to the management node via SSH as LDAP User failed", logger)
+	// Check SSSD service status
+	if err := CheckSSSDServiceStatus(t, sshMgmtClient, logger); err != nil {
+		utils.LogVerificationResult(t, err, "SSSD configuration verification failed", logger)
+		return
+	}
+
+	// Connect to the master node via SSH and handle errors
+	sshLdapClient, err := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, managementNodeIPList[0], ldapUserName, ldapPassword)
+	if err != nil {
+		utils.LogVerificationResult(t, err, "Connection to management node via SSH as LDAP User failed", logger)
 		return
 	}
 	defer sshLdapClient.Close()
 
 	// Check file mount
-	fileMountErr := HPCCheckFileMountAsLDAPUser(t, sshLdapClient, "management", logger)
-	utils.LogVerificationResult(t, fileMountErr, "check file mount as an LDAP user on the management node", logger)
+	if err := HPCCheckFileMountAsLDAPUser(t, sshLdapClient, "management", logger); err != nil {
+		utils.LogVerificationResult(t, err, "File mount check as LDAP user on management node failed", logger)
+	}
 
 	// Verify LSF commands on management node as LDAP user
-	lsfCmdErr := VerifyLSFCommandsAsLDAPUser(t, sshLdapClient, ldapUserName, "management", logger)
-	utils.LogVerificationResult(t, lsfCmdErr, "Check the 'lsf' command as an LDAP user on the management node", logger)
+	if err := VerifyLSFCommandsAsLDAPUser(t, sshLdapClient, ldapUserName, "management", logger); err != nil {
+		utils.LogVerificationResult(t, err, "LSF command verification as LDAP user on management node failed", logger)
+	}
 
-	// Run job as ldap user
-	jobErr := LSFRunJobsAsLDAPUser(t, sshLdapClient, jobCommand, ldapUserName, logger)
-	utils.LogVerificationResult(t, jobErr, "check Run job as an LDAP user on the management node", logger)
+	// Run job as LDAP user
+	if err := LSFRunJobsAsLDAPUser(t, sshLdapClient, jobCommand, ldapUserName, logger); err != nil {
+		utils.LogVerificationResult(t, err, "Running job as LDAP user on management node failed", logger)
+	}
 
-	// Loop through management node IPs and perform checks
-	for i := 0; i < len(managementNodeIPList); i++ {
-		sshLdapClientUser, connectionErr := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, managementNodeIPList[i], ldapUserName, ldapPassword)
-		if connectionErr == nil {
-			logger.Info(t, fmt.Sprintf("connect to the management node %s via SSH as LDAP User", managementNodeIPList[i]))
+	// Loop through management node IPs and perform SSH checks
+	for _, ip := range managementNodeIPList {
+		sshLdapClientUser, err := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, ip, ldapUserName, ldapPassword)
+		if err != nil {
+			utils.LogVerificationResult(t, err, "SSH connection to management node as LDAP user failed", logger)
+			continue
 		}
-		utils.LogVerificationResult(t, connectionErr, "connect to the management node via SSH as LDAP User", logger)
-		defer sshLdapClientUser.Close()
+		logger.Info(t, fmt.Sprintf("Connected to management node %s via SSH as LDAP user", ip))
+		sshLdapClientUser.Close() // Close connection immediately after usage
 	}
 }
 
-// VerifyLoginNodeLDAPConfig verifies the configuration of a login node by performing various checks.
-// It checks LDAP configuration, LSF commands, Run tasks, and file mount.
-// The results of the checks are logged using the provided logger.
+// VerifyLoginNodeLDAPConfig performs various checks on a login node's LDAP configuration.
+// It verifies the LDAP configuration, checks the SSSD service, mounts files, runs jobs, and checks LSF commands.
+// The results of each check are logged with the provided logger.
 func VerifyLoginNodeLDAPConfig(
 	t *testing.T,
 	sshLoginClient *ssh.Client,
-	bastionIP string,
-	loginNodeIP string,
-	ldapServerIP string,
-	jobCommand string,
-	ldapDomainName string,
-	ldapUserName string,
-	ldapPassword string,
+	bastionIP, loginNodeIP, ldapServerIP, jobCommand, ldapDomainName, ldapUserName, ldapPassword string,
 	logger *utils.AggregatedLogger,
 ) {
 	// Verify LDAP configuration
-	ldapErr := VerifyLDAPConfig(t, sshLoginClient, "login", ldapServerIP, ldapDomainName, ldapUserName, logger)
-	if ldapErr != nil {
-		utils.LogVerificationResult(t, ldapErr, "ldap configuration verification failed", logger)
+	if err := VerifyLDAPConfig(t, sshLoginClient, "login", ldapServerIP, ldapDomainName, ldapUserName, logger); err != nil {
+		utils.LogVerificationResult(t, err, "LDAP configuration verification failed", logger)
 		return
 	}
 
-	// Connect to the login node via SSH and handle connection errors
-	sshLdapClient, connectionErr := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, loginNodeIP, ldapUserName, ldapPassword)
-	if connectionErr != nil {
-		utils.LogVerificationResult(t, connectionErr, "connect to the login node via SSH as LDAP User failed", logger)
+	// Check SSSD service status
+	if err := CheckSSSDServiceStatus(t, sshLoginClient, logger); err != nil {
+		utils.LogVerificationResult(t, err, "SSSD configuration verification failed", logger)
+		return
+	}
+
+	// Connect to the login node via SSH and handle errors
+	sshLdapClient, err := utils.ConnectToHostAsLDAPUser(LSF_PUBLIC_HOST_NAME, bastionIP, loginNodeIP, ldapUserName, ldapPassword)
+	if err != nil {
+		utils.LogVerificationResult(t, err, "Connection to login node via SSH as LDAP User failed", logger)
 		return
 	}
 	defer sshLdapClient.Close()
 
 	// Check file mount
-	fileMountErr := HPCCheckFileMountAsLDAPUser(t, sshLdapClient, "login", logger)
-	utils.LogVerificationResult(t, fileMountErr, "check file mount as an LDAP user on the login node", logger)
+	if err := HPCCheckFileMountAsLDAPUser(t, sshLdapClient, "login", logger); err != nil {
+		utils.LogVerificationResult(t, err, "File mount check as LDAP user on login node failed", logger)
+	}
 
-	// Run job as ldap user
-	jobErr := LSFRunJobsAsLDAPUser(t, sshLdapClient, LOGIN_NODE_EXECUTION_PATH+jobCommand, ldapUserName, logger)
-	utils.LogVerificationResult(t, jobErr, "check Run job as an LDAP user on the login node", logger)
+	// Run job as LDAP user
+	if err := LSFRunJobsAsLDAPUser(t, sshLdapClient, LOGIN_NODE_EXECUTION_PATH+jobCommand, ldapUserName, logger); err != nil {
+		utils.LogVerificationResult(t, err, "Running job as LDAP user on login node failed", logger)
+	}
 
 	// Verify LSF commands on login node as LDAP user
-	lsfCmdErr := VerifyLSFCommandsAsLDAPUser(t, sshLdapClient, ldapUserName, "login", logger)
-	utils.LogVerificationResult(t, lsfCmdErr, "Check the 'lsf' command as an LDAP user on the login node", logger)
+	if err := VerifyLSFCommandsAsLDAPUser(t, sshLdapClient, ldapUserName, "login", logger); err != nil {
+		utils.LogVerificationResult(t, err, "LSF command verification as LDAP user on login node failed", logger)
+	}
 }
 
 // VerifyComputeNodeLDAPConfig verifies the LDAP configuration, file mount, LSF commands,

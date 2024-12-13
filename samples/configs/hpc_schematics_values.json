@@ -85,10 +85,17 @@
         },
         {
           "name": "reservation_id",
-          "value": "Please fill here",
+          "value": "__NULL__",
           "type": "string",
           "secure": true,
           "description": "Ensure that you have received the reservation ID from IBM technical sales. Reservation ID is a unique identifier to distinguish different IBM Cloud HPC service agreements. It must start with a letter and can only contain letters, numbers, hyphens (-), or underscores (_)."
+        },
+        {
+          "name": "ibm_customer_number",
+          "value": "__NULL__",
+          "type": "string",
+          "secure": true,
+          "description": "Comma-separated list of the IBM Customer Number(s) (ICN) that is used for the Bring Your Own License (BYOL) entitlement check. For more information on how to find your ICN, see [What is my IBM Customer Number (ICN)?](https://www.ibm.com/support/pages/what-my-ibm-customer-number-icn)."
         },
         {
           "name": "bastion_ssh_keys",
@@ -197,14 +204,14 @@
         },
         {
           "name": "management_image_name",
-          "value": "hpcaas-lsf10-rhel88-v11",
+          "value": "hpcaas-lsf10-rhel810-v1",
           "type": "string",
           "secure": false,
           "description": "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster management nodes. By default, the solution uses a RHEL88 base image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
         },
         {
           "name": "compute_image_name",
-          "value": "hpcaas-lsf10-rhel88-compute-v7",
+          "value": "hpcaas-lsf10-rhel810-compute-v8",
           "type": "string",
           "secure": false,
           "description": "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster dynamic compute nodes. By default, the solution uses a RHEL 8-8 OS image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). The solution also offers, Ubuntu 22-04 OS base image (hpcaas-lsf10-ubuntu2204-compute-v7). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
@@ -212,7 +219,7 @@
         },
         {
           "name": "login_image_name",
-          "value": "hpcaas-lsf10-rhel88-compute-v7",
+          "value": "hpcaas-lsf10-rhel810-compute-v8",
           "type": "string",
           "secure": false,
           "description": "Name of the custom image that you want to use to create virtual server instances in your IBM Cloud account to deploy the IBM Cloud HPC cluster login node. By default, the solution uses a RHEL 8-8 OS image with additional software packages mentioned [here](https://cloud.ibm.com/docs/ibm-spectrum-lsf#create-custom-image). The solution also offers, Ubuntu 22-04 OS base image (hpcaas-lsf10-ubuntu2204-compute-v7). If you would like to include your application-specific binary files, follow the instructions in [ Planning for custom images ](https://cloud.ibm.com/docs/vpc?topic=vpc-planning-custom-images) to create your own custom image and use that to build the IBM Cloud HPC cluster through this offering."
@@ -223,6 +230,34 @@
           "type": "string",
           "secure": false,
           "description": "Specify the virtual server instance profile type to be used to create the login node for the IBM Cloud HPC cluster. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
+        },
+        {
+          "name": "worker_node_instance_type",
+          "value": "bx2-16x64",
+          "type": "string",
+          "secure": false,
+          "description": "pecify the virtual server instance profile type name to be used to create the worker nodes for the Spectrum LSF cluster. The worker nodes are the ones where the workload execution takes place and the choice should be made according to the characteristic of workloads. For choices on profile types, see [Instance Profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles&interface=ui). Note: If dedicated_host_enabled == true, available instance prefix (e.g., bx2 and cx2) can be limited depending on your target region. Check `ibmcloud target -r {region_name}; ibmcloud is dedicated-host-profiles."
+        },
+        {
+          "name": "worker_node_min_count",
+          "value": "0",
+          "type": "number",
+          "secure": false,
+          "description": "The minimum number of worker nodes. This is the number of static worker nodes that will be provisioned at the time the cluster is created. If using NFS storage, enter a value in the range 0 - 500. If using Spectrum Scale storage, enter a value in the range 1 - 64. NOTE: Spectrum Scale requires a minimum of 3 compute nodes (combination of management-host, management-host-candidate, and worker nodes) to establish a [quorum](https://www.ibm.com/docs/en/spectrum-scale/5.1.5?topic=failure-quorum#nodequo) and maintain data consistency in the event of a node failure. Therefore, the minimum value of 1 may need to be larger if the value specified for management_node_count is less than 2.."
+        },
+        {
+          "name": "worker_node_max_count",
+          "value": "10",
+          "type": "number",
+          "secure": false,
+          "description": "The maximum number of worker nodes that can be deployed in the Spectrum LSF cluster. In order to use the [Resource Connector](https://www.ibm.com/docs/en/spectrum-lsf/10.1.0?topic=lsf-resource-connnector) feature to dynamically create and delete worker nodes based on workload demand, the value selected for this parameter must be larger than worker_node_min_count. If you plan to deploy only static worker nodes in the LSF cluster, e.g., when using Spectrum Scale storage, the value for this parameter should be equal to worker_node_min_count. Enter a value in the range 1 - 500."
+        },
+        {
+          "name": "solution",
+          "value": "lsf",
+          "type": "string",
+          "secure": false,
+          "description": "Provide the value for the solution that is needed for the support of lsf and HPC."
         },
         {
           "name": "management_node_instance_type",

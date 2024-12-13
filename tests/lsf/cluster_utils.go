@@ -1043,8 +1043,14 @@ func verifyDirectories(t *testing.T, sClient *ssh.Client, ip string, logger *uti
 	}
 	// Split the output into directory names
 	actualDirs := strings.Fields(strings.TrimSpace(string(outputTwo)))
-	// Define expected directories
-	expectedDirs := []string{"10.1", "conf", "config_done", "das_staging_area", "data", "gui-conf", "gui-logs", "log", "repository-path", "work"}
+
+	// Define expected directories conditionally
+	var expectedDirs []string
+	if utils.IsStringInSlice(actualDirs, "openldap") {
+		expectedDirs = []string{"conf", "config_done", "das_staging_area", "data", "gui-logs", "log", "openldap", "repository-path", "work"}
+	} else {
+		expectedDirs = []string{"conf", "config_done", "das_staging_area", "data", "gui-logs", "log", "repository-path", "work"}
+	}
 
 	// Verify if all expected directories exist
 	if !utils.VerifyDataContains(t, actualDirs, expectedDirs, logger) {
@@ -1343,7 +1349,7 @@ func LSFRunJobsAsLDAPUser(t *testing.T, sClient *ssh.Client, jobCmd, ldapUser st
 	return fmt.Errorf("job execution for ID %s exceeded the specified time", jobID)
 }
 
-// HPCCheckFileMountAsLDAPUser checks if essential LSF directories (10.1, conf, config_done, das_staging_area, data, gui-conf, gui-logs, log, repository-path and work) exist
+// HPCCheckFileMountAsLDAPUser checks if essential LSF directories (10.1, conf, config_done, das_staging_area, data, gui-conf, gui-logs, log, openldap, repository-path and work) exist
 // on remote machines It utilizes SSH to
 // query and validate the directories. Any missing directory triggers an error, and the
 // function logs the success message if all directories are found.
@@ -1429,8 +1435,9 @@ func verifyDirectoriesAsLdapUser(t *testing.T, sClient *ssh.Client, hostname str
 	}
 	// Split the output into directory names
 	actualDirs := strings.Fields(strings.TrimSpace(string(outputTwo)))
+
 	// Define expected directories
-	expectedDirs := []string{"10.1", "conf", "config_done", "das_staging_area", "data", "gui-conf", "gui-logs", "log", "repository-path", "work"}
+	expectedDirs := []string{"conf", "config_done", "das_staging_area", "data", "gui-logs", "log", "openldap", "repository-path", "work"}
 
 	// Verify if all expected directories exist
 	if !utils.VerifyDataContains(t, actualDirs, expectedDirs, logger) {
@@ -1562,6 +1569,18 @@ func VerifyLDAPServerConfig(t *testing.T, sClient *ssh.Client, ldapAdminpassword
 	expected := fmt.Sprintf("BASE   dc=%s,dc=%s", strings.Split(ldapDomain, ".")[0], strings.Split(ldapDomain, ".")[1])
 	if !utils.VerifyDataContains(t, actual, expected, logger) {
 		return fmt.Errorf("LDAP configuration check failed: Expected '%s', got '%s'", expected, actual)
+	}
+
+	// Verify TLS_CACERT configuration
+	expectedTLSCACert := "TLS_CACERT /etc/ssl/certs/ldap_cacert.pem"
+	if !utils.VerifyDataContains(t, actual, expectedTLSCACert, logger) {
+		return fmt.Errorf("TLS_CACERT verification failed: Expected configuration '%s' was not found in actual LDAP config: '%s'", expectedTLSCACert, actual)
+	}
+
+	// Verify TLS_REQCERT configuration
+	expectedTLSReqCert := "TLS_REQCERT allow"
+	if !utils.VerifyDataContains(t, actual, expectedTLSReqCert, logger) {
+		return fmt.Errorf("TLS_REQCERT verification failed: Expected configuration '%s' was not found in actual LDAP config: '%s'", expectedTLSReqCert, actual)
 	}
 
 	// Perform an LDAP search to validate the configuration
@@ -1899,6 +1918,8 @@ func HPCAddNewLDAPUser(t *testing.T, sClient *ssh.Client, ldapAdminPassword, lda
 	// Replace the existing LDAP user name with the new LDAP user name
 	ldifContent := strings.ReplaceAll(actual, ldapUser, newLdapUser)
 
+	ldifContent = strings.ReplaceAll(ldifContent, "10000", "20000")
+
 	// Create the new LDIF file on the LDAP server
 	_, fileCreationErr := utils.ToCreateFileWithContent(t, sClient, ".", "user2.ldif", ldifContent, logger)
 	if fileCreationErr != nil {
@@ -2011,4 +2032,50 @@ func ValidateFlowLogs(t *testing.T, apiKey, region, resourceGroup, clusterPrefix
 
 	logger.Info(t, fmt.Sprintf("flow Logs '%s' retrieved successfully", flowLogName))
 	return nil
+}
+
+// CheckSSSDServiceStatus checks the status of the SSSD service.
+// It runs an SSH command to verify if the service is active and returns an error if it is not.
+func CheckSSSDServiceStatus(t *testing.T, sClient *ssh.Client, logger *utils.AggregatedLogger) error {
+	// Command to check the SSSD service status
+	const sssdStatusCmd = "sudo systemctl status sssd.service -n 0"
+
+	// Execute command to check service status
+	sssdStatusOutput, err := utils.RunCommandInSSHSession(sClient, sssdStatusCmd)
+	if err != nil {
+		return fmt.Errorf("failed to execute command '%s' via SSH: %w", sssdStatusCmd, err)
+	}
+
+	// Verify if the SSSD service is active
+	if utils.VerifyDataContains(t, sssdStatusOutput, "Active: active (running)", logger) {
+		logger.Info(t, "The SSSD service is active.")
+		return nil
+	}
+
+	// Return error if the service is not active, with output for debugging
+	return fmt.Errorf("SSSD service is not active. Output: %s", sssdStatusOutput)
+}
+
+// GetLDAPServerCert retrieves the LDAP server certificate by connecting to the LDAP server via SSH.
+// It requires the public host name, bastion IP, LDAP host name, and LDAP server IP as inputs.
+// Returns the certificate as a string if successful or an error otherwise.
+func GetLDAPServerCert(publicHostName, bastionIP, ldapHostName, ldapServerIP string) (string, error) {
+	// Establish SSH connection to LDAP server via bastion host
+	sshClient, connectionErr := utils.ConnectToHost(publicHostName, bastionIP, ldapHostName, ldapServerIP)
+	if connectionErr != nil {
+		return "", fmt.Errorf("failed to connect to LDAP server via SSH: %w", connectionErr)
+	}
+	defer sshClient.Close()
+
+	// Command to retrieve LDAP server certificate
+	const ldapServerCertCmd = `cat /etc/ssl/certs/ldap_cacert.pem`
+
+	// Execute command to retrieve certificate
+	ldapServerCert, execErr := utils.RunCommandInSSHSession(sshClient, ldapServerCertCmd)
+	if execErr != nil {
+		return "", fmt.Errorf("failed to execute command '%s' via SSH: %w", ldapServerCertCmd, execErr)
+	}
+
+	// Return the retrieved certificate
+	return ldapServerCert, nil
 }

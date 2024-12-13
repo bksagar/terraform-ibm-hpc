@@ -44,6 +44,18 @@ variable "scc_provision" {
 #   description = "SCC Instance region (possible choices 'us-south', 'eu-de', 'ca-tor', 'eu-es')"
 # }
 
+variable "en_source_name" {
+  type        = string
+  default     = "compliance"
+  description = "The source name to use for the Event Notifications integration. Required if a value is passed for `en_instance_crn`. This name must be unique per SCC instance that is integrated with the Event Notfications instance."
+}
+
+variable "en_source_description" {
+  type        = string
+  default     = "This is part of the HPC deployment."
+  description = "Optional description to give for the Event Notifications integration source. Only used if a value is passed for `en_instance_crn`."
+}
+
 # SCC Instance Plan
 variable "scc_plan" {
   type        = string

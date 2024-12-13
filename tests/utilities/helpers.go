@@ -423,3 +423,13 @@ func RemoveKeys(m map[string]interface{}, keysToRemove []string) {
 		delete(m, key)
 	}
 }
+
+// IsStringInSlice checks if a string exists in a slice of strings.
+func IsStringInSlice(slice []string, item string) bool {
+	for _, str := range slice {
+		if str == item {
+			return true
+		}
+	}
+	return false
+}

@@ -115,19 +115,19 @@ variable "compute_ssh_keys" {
 
 variable "management_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-v11"
+  default     = "hpcaas-lsf10-rhel810-v12"
   description = "Image name to use for provisioning the management cluster instances."
 }
 
 variable "compute_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-compute-v7"
+  default     = "hpcaas-lsf10-rhel810-compute-v8"
   description = "Image name to use for provisioning the compute cluster instances."
 }
 
 variable "login_image_name" {
   type        = string
-  default     = "hpcaas-lsf10-rhel88-compute-v7"
+  default     = "hpcaas-lsf10-rhel810-compute-v8"
   description = "Image name to use for provisioning the login instance."
 }
 
@@ -421,4 +421,61 @@ variable "existing_kms_instance_guid" {
   type        = string
   default     = null
   description = "GUID of boot volume encryption key"
+}
+
+variable "cloud_logs_ingress_private_endpoint" {
+  description = "String describing resource groups to create or reference"
+  type        = string
+  default     = null
+}
+
+variable "observability_logs_enable_for_management" {
+  description = "Set false to disable IBM Cloud Logs integration. If enabled, infrastructure and LSF application logs from Management Nodes will be ingested."
+  type        = bool
+  default     = false
+}
+
+variable "observability_logs_enable_for_compute" {
+  description = "Set false to disable IBM Cloud Logs integration. If enabled, infrastructure and LSF application logs from Compute Nodes will be ingested."
+  type        = bool
+  default     = false
+}
+
+variable "solution" {
+  type        = string
+  default     = "lsf"
+  description = "Provide the value for the solution that is needed for the support of lsf and HPC"
+}
+
+variable "ibm_customer_number" {
+  type        = string
+  sensitive   = true
+  default     = ""
+  description = "Comma-separated list of the IBM Customer Number(s) (ICN) that is used for the Bring Your Own License (BYOL) entitlement check. For more information on how to find your ICN, see [What is my IBM Customer Number (ICN)?](https://www.ibm.com/support/pages/what-my-ibm-customer-number-icn)."
+}
+
+variable "worker_node_min_count" {
+  type        = number
+  default     = 0
+  description = "The minimum number of worker nodes. This is the number of static worker nodes that will be provisioned at the time the cluster is created. If using NFS storage, enter a value in the range 0 - 500. If using Spectrum Scale storage, enter a value in the range 1 - 64. NOTE: Spectrum Scale requires a minimum of 3 compute nodes (combination of management-host, management-host-candidate, and worker nodes) to establish a [quorum](https://www.ibm.com/docs/en/spectrum-scale/5.1.5?topic=failure-quorum#nodequo) and maintain data consistency in the event of a node failure. Therefore, the minimum value of 1 may need to be larger if the value specified for management_node_count is less than 2."
+  validation {
+    condition     = 0 <= var.worker_node_min_count && var.worker_node_min_count <= 500
+    error_message = "Input \"worker_node_min_count\" must be >= 0 and <= 500."
+  }
+}
+
+variable "worker_node_max_count" {
+  type        = number
+  default     = 10
+  description = "The maximum number of worker nodes that can be deployed in the Spectrum LSF cluster. In order to use the [Resource Connector](https://www.ibm.com/docs/en/spectrum-lsf/10.1.0?topic=lsf-resource-connnector) feature to dynamically create and delete worker nodes based on workload demand, the value selected for this parameter must be larger than worker_node_min_count. If you plan to deploy only static worker nodes in the LSF cluster, e.g., when using Spectrum Scale storage, the value for this parameter should be equal to worker_node_min_count. Enter a value in the range 1 - 500."
+  validation {
+    condition     = 1 <= var.worker_node_max_count && var.worker_node_max_count <= 500
+    error_message = "Input \"worker_node_max_count must\" be >= 1 and <= 500."
+  }
+}
+
+variable "worker_node_instance_type" {
+  type        = string
+  default     = "bx2-4x16"
+  description = "Specify the virtual server instance profile type name to be used to create the worker nodes for the Spectrum LSF cluster. The worker nodes are the ones where the workload execution takes place and the choice should be made according to the characteristic of workloads. For choices on profile types, see [Instance Profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles&interface=ui). Note: If dedicated_host_enabled == true, available instance prefix (e.g., bx2 and cx2) can be limited depending on your target region. Check `ibmcloud target -r {region_name}; ibmcloud is dedicated-host-profiles."
 }

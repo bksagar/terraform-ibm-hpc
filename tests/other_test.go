@@ -1590,6 +1590,12 @@ func TestRunExistingLDAP(t *testing.T) {
 	// Generate random prefix for the second HPC cluster
 	hpcClusterPrefix2 := utils.GenerateRandomString()
 
+	// Retrieve LDAP server certificate via SSH and assert no connection errors.
+	ldapServerCert, serverCertErr := lsf.GetLDAPServerCert(lsf.LSF_PUBLIC_HOST_NAME, ldapServerBastionIP, lsf.LSF_LDAP_HOST_NAME, ldapIP)
+	require.NoError(t, serverCertErr, "Failed to retrieve LDAP server certificate via SSH")
+
+	testLogger.Info(t, ldapServerCert)
+
 	// Create test options for the second cluster
 	options2, err := setupOptions(t, hpcClusterPrefix2, terraformDir, envVars.DefaultResourceGroup, ignoreDestroys)
 	require.NoError(t, err, "Error setting up test options for the second cluster: %v", err)
@@ -1604,6 +1610,7 @@ func TestRunExistingLDAP(t *testing.T) {
 	options2.TerraformVars["enable_ldap"] = strings.ToLower(envVars.EnableLdap)
 	options2.TerraformVars["ldap_basedns"] = envVars.LdapBaseDns
 	options2.TerraformVars["ldap_server"] = ldapIP
+	options2.TerraformVars["ldap_server_cert"] = strings.TrimSpace(ldapServerCert)
 
 	// Skip test teardown for further inspection
 	options2.SkipTestTearDown = true

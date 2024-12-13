@@ -1,27 +1,32 @@
-#!/bin/bash
+#!/bin/sh
 # shellcheck disable=all
+###################################################
+# Copyright (C) IBM Corp. 2021 All Rights Reserved.
+# Licensed under the Apache License v2.0
+###################################################
 
-if [ "$compute_user_data_vars_ok" != "1" ]; then
-  echo 2>&1 "fatal: vars block is missing"
-  exit 1
-fi
+logfile="/tmp/worker_vsi.log"
+echo "START $(date '+%Y-%m-%d %H:%M:%S')" >> "$logfile"
 
-echo "Logging initial env variables" >> $logfile
-env|sort >> $logfile
-
-# Disallow root login
-sed -i -e "s/^/no-port-forwarding,no-agent-forwarding,no-X11-forwarding,command=\"echo \'Please login as the user \\\"lsfadmin or vpcuser\\\" rather than the user \\\"root\\\".\';echo;sleep 5; exit 142\" /" /root/.ssh/authorized_keys
-
-# Updates the lsfadmin user as never expire
-chage -I -1 -m 0 -M 99999 -E -1 -W 14 lsfadmin
-
-# Setup Hostname
+# Local variable declaration
+nfs_server_with_mount_path=${mount_path}
+enable_ldap="${enable_ldap}"
+ldap_server_ip="${ldap_server_ip}"
+base_dn="${ldap_basedns}"
+cluster_name=${cluster_name}
 HostIP=$(hostname -I | awk '{print $1}')
-hostname=${cluster_prefix}-${HostIP//./-}
-this_hostname="$(hostname)"
-hostnamectl set-hostname "$hostname"
+HostName=$(hostname)
+#ManagementHostNames=""
+#for (( i=1; i<=management_node_count; i++ ))
+#do
+#  ManagementHostNames+=" ${cluster_prefix}-mgmt-$i"
+#done
 
-echo "START $(date '+%Y-%m-%d %H:%M:%S')" >> $logfile
+mgmt_hostname_primary="$management_hostname"
+mgmt_hostnames="${management_hostname},${management_cand_hostnames}"
+mgmt_hostnames="${mgmt_hostnames//,/ }" # replace commas with spaces
+mgmt_hostnames="${mgmt_hostnames# }" # remove an initial space
+mgmt_hostnames="${mgmt_hostnames% }" # remove a final space
 
 # Setup Network configuration
 # Change the MTU setting as this is required for setting mtu as 9000 for communication to happen between clusters
@@ -31,9 +36,7 @@ if grep -q "NAME=\"Red Hat Enterprise Linux\"" /etc/os-release; then
     echo "DOMAIN=\"${dns_domain}\"" >> "/etc/sysconfig/network-scripts/ifcfg-${network_interface}"
     # Change the MTU setting as 9000 at router level.
     gateway_ip=$(ip route | grep default | awk '{print $3}' | head -n 1)
-    cidr_range=$(ip route show | grep "kernel" | awk '{print $1}' | head -n 1)
-    echo "$cidr_range via $gateway_ip dev ${network_interface} metric 0 mtu 9000" >> /etc/sysconfig/network-scripts/route-eth0
-    # Restart the Network Manager.
+    echo "${rc_cidr_block} via $gateway_ip dev ${network_interface} metric 0 mtu 9000" >> /etc/sysconfig/network-scripts/route-eth0
     systemctl restart NetworkManager
 elif grep -q "NAME=\"Ubuntu\"" /etc/os-release; then
     net_int=$(basename /sys/class/net/en*)
@@ -45,9 +48,9 @@ elif grep -q "NAME=\"Ubuntu\"" /etc/os-release; then
     if ! grep -qE "^[[:space:]]*mtu: 9000" $netplan_config; then
         echo "MTU 9000 Packages entries not found"
         # Append the MTU configuration to the Netplan file
-        sudo sed -i '/'"$net_int"':/a\            mtu: 9000' $netplan_config
-        sudo sed -i "/dhcp4: true/a \            nameservers:\n              search: [$dns_domain]" $netplan_config
-        sudo sed -i '/'"$net_int"':/a\            routes:\n              - to: '"$cidr_range"'\n                via: '"$gateway_ip"'\n                metric: 100\n                mtu: 9000' $netplan_config
+        sudo sed -i '/'$net_int':/a\            mtu: 9000' $netplan_config
+        sudo sed -i '/dhcp4: true/a \            nameservers:\n              search: ['$dns_domain']' $netplan_config
+        sudo sed -i '/'$net_int':/a\            routes:\n              - to: '$cidr_range'\n                via: '$gateway_ip'\n                metric: 100\n                mtu: 9000' $netplan_config
         sudo netplan apply
         echo "MTU set to 9000 on Netplan."
     else
@@ -58,7 +61,6 @@ fi
 # Setup VPC FileShare | NFS Mount
 LSF_TOP="/opt/ibm/lsf"
 echo "Initiating LSF share mount" >> $logfile
-
 # Function to attempt NFS mount with retries
 mount_nfs_with_retries() {
   local server_path=$1
@@ -82,14 +84,12 @@ mount_nfs_with_retries() {
   done
 
   if [ "$success" = true ]; then
-    chmod 777 "${client_path}"
     echo "${server_path} ${client_path} nfs rw,sec=sys,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,_netdev 0 0" >> /etc/fstab
   else
     echo "Mount not found for ${server_path} on ${client_path} after $retries attempts." >> $logfile
     rm -rf "${client_path}"
   fi
 
-  # Convert success to numeric for return
   if [ "$success" = true ]; then
     return 0
   else
@@ -101,10 +101,12 @@ mount_nfs_with_retries() {
 if [ -n "${nfs_server_with_mount_path}" ]; then
   echo "File share ${nfs_server_with_mount_path} found" >> $logfile
   nfs_client_mount_path="/mnt/lsf"
+  rm -rf /opt/ibm/lsf/conf/
+  rm -rf /opt/ibm/lsf/work/
   if mount_nfs_with_retries "${nfs_server_with_mount_path}" "${nfs_client_mount_path}"; then
     # Move stuff to shared fs
-    for dir in conf work das_staging_area; do
-      rm -rf "${LSF_TOP}/$dir"
+    for dir in conf work; do
+      mv "${LSF_TOP}/$dir" "${nfs_client_mount_path}"
       ln -fs "${nfs_client_mount_path}/$dir" "${LSF_TOP}/$dir"
     done
     chown -R lsfadmin:root "${LSF_TOP}"
@@ -112,6 +114,9 @@ if [ -n "${nfs_server_with_mount_path}" ]; then
     echo "Mount not found for ${nfs_server_with_mount_path}, Exiting !!" >> $logfile
     exit 1
   fi
+else
+  echo "No NFS server mount path provided, Exiting !!" >> $logfile
+  exit 1
 fi
 echo "Setting LSF share is completed." >> $logfile
 
@@ -125,6 +130,7 @@ if [ -n "${custom_file_shares}" ]; then
 
   for (( i=0; i<length; i++ )); do
     mount_nfs_with_retries "${file_share_array[$i]}" "${mount_path_array[$i]}"
+    chmod 777 "${mount_path_array[$i]}"
   done
 fi
 echo "Setting custom file shares is completed." >> $logfile
@@ -132,34 +138,57 @@ echo "Setting custom file shares is completed." >> $logfile
 # Setup LSF environment variables
 LSF_TOP="/opt/ibm/lsf_worker"
 LSF_TOP_VERSION=10.1
-LSF_CONF=$LSF_TOP/conf
-LSF_CONF_FILE=$LSF_CONF/lsf.conf
-LSF_HOSTS_FILE=$LSF_CONF/hosts
-. $LSF_CONF/profile.lsf                       # WARNING: this may unset LSF_TOP and LSF_VERSION
-echo "Logging env variables" >> $logfile
-env | sort >> $logfile
-
-# Defining ncpus based on hyper-threading
-if [ "$hyperthreading" == true ]; then
-  ego_define_ncpus="threads"
-else
-  ego_define_ncpus="cores"
-  cat << 'EOT' > /root/lsf_hyperthreading
-#!/bin/sh
-for vcpu in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -s -d- -f2 | cut -d- -f2 | uniq); do
-    echo "0" > "/sys/devices/system/cpu/cpu"$vcpu"/online"
-done
-EOT
-  chmod 755 /root/lsf_hyperthreading
-  command="/root/lsf_hyperthreading"
-  sh $command && (crontab -l 2>/dev/null; echo "@reboot $command") | crontab -
-fi
-echo "EGO_DEFINE_NCPUS=${ego_define_ncpus}" >> $LSF_CONF_FILE
+LSF_CONF="$LSF_TOP/conf"
+LSF_CONF_FILE="$LSF_CONF/lsf.conf"
+LSF_HOSTS_FILE="/opt/ibm/lsf/conf/hosts"
+. "$LSF_CONF/profile.lsf"
+echo "Logging env variables" >> "$logfile"
+env | sort >> "$logfile"
 
 # Update lsf configuration
 echo 'LSB_MC_DISABLE_HOST_LOOKUP=Y' >> $LSF_CONF_FILE
 echo "LSF_RSH=\"ssh -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no'\"" >> $LSF_CONF_FILE
-sed -i "s/LSF_SERVER_HOSTS=.*/LSF_SERVER_HOSTS=\"$ManagementHostNames\"/g" $LSF_CONF_FILE
+sed -i "s/LSF_SERVER_HOSTS=.*/LSF_SERVER_HOSTS=\"$mgmt_hostnames\"/g" $LSF_CONF_FILE
+
+# Update the entry  to LSF_HOSTS_FILE
+#sed -i "s/^$HostIP .*/$HostIP $HostName/g" /opt/ibm/lsf/conf/hosts
+#if grep -q "^$HostIP" "$LSF_HOSTS_FILE"; then
+#  sed -i "s/^$HostIP .*/$HostIP $HostName/g" "$LSF_HOSTS_FILE"
+#else
+#  echo "$HostIP $HostName" >> "$LSF_HOSTS_FILE"
+#fi
+#echo "$HostIP $HostName" >> "$LSF_HOSTS_FILE"
+
+MAX_RETRIES=5
+count=0
+
+# Loop to attempt the update until successful or max retries reached
+for ((i=1; i<=MAX_RETRIES; i++)); do
+  # Attempt to update the entry
+  sed -i "s/^$HostIP .*/$HostIP $HostName/g" "$LSF_HOSTS_FILE"
+
+  # Validate if the update was successful
+  if grep -q "^$HostIP $HostName" "$LSF_HOSTS_FILE"; then
+    echo "Successfully updated $HostIP $HostName in $LSF_HOSTS_FILE."
+    break
+  else
+    echo "Attempt $i: Update failed, retrying..."
+    sleep 5
+  fi
+
+  # Check if max retries reached
+  if [ "$i" -eq "$MAX_RETRIES" ]; then
+    echo "Failed to update $HostIP $HostName in $LSF_HOSTS_FILE after $MAX_RETRIES attempts."
+    exit 1
+  fi
+done
+
+for hostname in $mgmt_hostnames; do
+  while ! grep "$hostname" "/opt/ibm/lsf/conf/hosts"; do
+    echo "Waiting for $hostname to be added to LSF host file" >> $logfile
+    sleep 5
+  done
+done
 
 # TODO: Understand usage
 # Support rc_account resource to enable RC_ACCOUNT policy
@@ -181,6 +210,24 @@ else
   echo "Can not get instance ID" >> $logfile
 fi
 
+# Defining ncpus based on hyper-threading
+echo "$hyperthreading"
+if [ "$hyperthreading" == true ]; then
+  ego_define_ncpus="threads"
+else
+  ego_define_ncpus="cores"
+  cat << 'EOT' > /root/lsf_hyperthreading
+#!/bin/sh
+for vcpu in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -s -d- -f2 | cut -d- -f2 | uniq); do
+    echo "0" > "/sys/devices/system/cpu/cpu"$vcpu"/online"
+done
+EOT
+  chmod 755 /root/lsf_hyperthreading
+  command="/root/lsf_hyperthreading"
+  sh $command && (crontab -l 2>/dev/null; echo "@reboot $command") | crontab -
+fi
+echo "EGO_DEFINE_NCPUS=${ego_define_ncpus}" >> "$LSF_CONF_FILE"
+
 #Update LSF Tuning on dynamic hosts
 LSF_TUNABLES="etc/sysctl.conf"
 echo 'vm.overcommit_memory=1' >> $LSF_TUNABLES
@@ -192,25 +239,35 @@ echo 'net.ipv4.tcp_fin_timeout = 5' >> $LSF_TUNABLES
 echo 'net.core.somaxconn = 8000' >> $LSF_TUNABLES
 sudo sysctl -p $LSF_TUNABLES
 
+# Setup lsfadmin user
+# Updates the lsfadmin user as never expire
+chage -I -1 -m 0 -M 99999 -E -1 -W 14 lsfadmin
 # Setup ssh
 lsfadmin_home_dir="/home/lsfadmin"
 lsfadmin_ssh_dir="${lsfadmin_home_dir}/.ssh"
-mkdir -p $lsfadmin_ssh_dir
+mkdir -p ${lsfadmin_ssh_dir}
 if grep -q "NAME=\"Red Hat Enterprise Linux\"" /etc/os-release; then
-  cp /home/vpcuser/.ssh/authorized_keys $lsfadmin_ssh_dir/authorized_keys
+  sudo cp /home/vpcuser/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
 else
   cp /home/ubuntu/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
-  sudo cp /home/ubuntu/.profile $lsfadmin_home_dir
+  sudo cp /home/ubuntu/.profile /home/lsfadmin
 fi
-echo "${lsf_public_key}" >> $lsfadmin_ssh_dir/authorized_keys
-echo "StrictHostKeyChecking no" >> $lsfadmin_ssh_dir/config
-chmod 600 $lsfadmin_ssh_dir/authorized_keys
-chmod 700 $lsfadmin_ssh_dir
-chown -R lsfadmin:lsfadmin $lsfadmin_ssh_dir
+cp /home/vpcuser/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
+echo "${cluster_public_key_content}" >> "${lsfadmin_ssh_dir}/authorized_keys"
+echo "${cluster_private_key_content}" >> "${lsfadmin_ssh_dir}/id_rsa"
+echo "StrictHostKeyChecking no" >> "${lsfadmin_ssh_dir}/config"
+chmod 600 "${lsfadmin_ssh_dir}/authorized_keys"
+chmod 600 "${lsfadmin_ssh_dir}/id_rsa"
+chmod 700 ${lsfadmin_ssh_dir}
+chown -R lsfadmin:lsfadmin ${lsfadmin_ssh_dir}
 echo "SSH key setup for lsfadmin user is completed" >> $logfile
-echo "source ${LSF_CONF}/profile.lsf" >> $lsfadmin_home_dir/.bashrc
-echo "source /opt/intel/oneapi/setvars.sh >> /dev/null" >> $lsfadmin_home_dir/.bashrc
-echo "Setting up LSF env variables for lasfadmin user is completed" >> $logfile
+
+# Setup root user
+root_ssh_dir="/root/.ssh"
+echo "${cluster_public_key_content}" >> $root_ssh_dir/authorized_keys
+echo "StrictHostKeyChecking no" >> $root_ssh_dir/config
+echo "cluster ssh key has been added to root user" >> $logfile
+
 
 # Create lsf.sudoers file to support single lsfstartup and lsfrestart command from management node
 echo 'LSF_STARTUP_USERS="lsfadmin"' | sudo tee -a /etc/lsf1.sudoers
@@ -228,8 +285,147 @@ echo "Added LSF administrators to start LSF daemons" >> $logfile
 
 # Install LSF as a service and start up
 /opt/ibm/lsf_worker/10.1/install/hostsetup --top="/opt/ibm/lsf_worker" --boot="y" --start="y" --dynamic 2>&1 >> $logfile
+systemctl status lsfd
 cat /opt/ibm/lsf/conf/hosts >> /etc/hosts
 
+lsfadmin_home_dir="/home/lsfadmin"
+echo "source ${LSF_CONF}/profile.lsf" >> /root/.bashrc
+echo "source ${LSF_CONF}/profile.lsf" >> "${lsfadmin_home_dir}"/.bashrc
+
+#
+## Create lsf.sudoers file to support single lsfstartup and lsfrestart command from management node
+#cat <<EOT > "/etc/lsf.sudoers"
+#LSF_STARTUP_USERS="lsfadmin"
+#LSF_STARTUP_PATH=$LSF_TOP_VERSION/linux3.10-glibc2.17-x86_64/etc/
+#EOT
+#chmod 600 /etc/lsf.sudoers
+#ls -l /etc/lsf.sudoers
+#
+#$LSF_TOP_VERSION/install/hostsetup --top="$LSF_TOP" --setuid
+#echo "Added LSF administrators to start LSF daemons"
+#
+#lsfadmin_home_dir="/home/lsfadmin"
+#echo "source ${LSF_CONF}/profile.lsf" >> /root/.bashrc
+#echo "source ${LSF_CONF}/profile.lsf" >> "${lsfadmin_home_dir}"/.bashrc
+## Setup ssh
+#
+#
+## Setup lsfadmin user
+## Updates the lsfadmin user as never expire
+#chage -I -1 -m 0 -M 99999 -E -1 -W 14 lsfadmin
+## Setup ssh
+#lsfadmin_home_dir="/home/lsfadmin"
+#lsfadmin_ssh_dir="${lsfadmin_home_dir}/.ssh"
+#mkdir -p ${lsfadmin_ssh_dir}
+#if grep -q "NAME=\"Red Hat Enterprise Linux\"" /etc/os-release; then
+#  sudo cp /home/vpcuser/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
+#else
+#  cp /home/ubuntu/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
+#  sudo cp /home/ubuntu/.profile /home/lsfadmin
+#fi
+#cp /home/vpcuser/.ssh/authorized_keys "${lsfadmin_ssh_dir}/authorized_keys"
+#echo "${cluster_public_key_content}" >> "${lsfadmin_ssh_dir}/authorized_keys"
+#echo "${cluster_private_key_content}" >> "${lsfadmin_ssh_dir}/id_rsa"
+#echo "StrictHostKeyChecking no" >> "${lsfadmin_ssh_dir}/config"
+#chmod 600 "${lsfadmin_ssh_dir}/authorized_keys"
+#chmod 600 "${lsfadmin_ssh_dir}/id_rsa"
+#chmod 700 ${lsfadmin_ssh_dir}
+#chown -R lsfadmin:lsfadmin ${lsfadmin_ssh_dir}
+#echo "SSH key setup for lsfadmin user is completed" >> $logfile
+#
+## Setup root user
+#root_ssh_dir="/root/.ssh"
+#echo "${cluster_public_key_content}" >> $root_ssh_dir/authorized_keys
+#echo "StrictHostKeyChecking no" >> $root_ssh_dir/config
+#echo "cluster ssh key has been added to root user" >> $logfile
+#
+## Update LSF Tunables
+#LSF_TUNABLES="/etc/sysctl.conf"
+#echo "1" > /proc/sys/vm/overcommit_memory
+#echo 'vm.overcommit_memory=1' > "$LSF_TUNABLES"
+#echo 'net.core.rmem_max=26214400' >> "$LSF_TUNABLES"
+#echo 'net.core.rmem_default=26214400' >> "$LSF_TUNABLES"
+#echo 'net.core.wmem_max=26214400' >> "$LSF_TUNABLES"
+#echo 'net.core.wmem_default=26214400' >> "$LSF_TUNABLES"
+#echo 'net.ipv4.tcp_fin_timeout = 5' >> "$LSF_TUNABLES"
+#echo 'net.core.somaxconn = 8000' >> "$LSF_TUNABLES"
+#sysctl -p "$LSF_TUNABLES"
+#
+## Defining ncpus based on hyper-threading
+#echo "$hyperthreading"
+#if [ "$hyperthreading" == true ]; then
+#  ego_define_ncpus="threads"
+#else
+#  ego_define_ncpus="cores"
+#  cat << 'EOT' > /root/lsf_hyperthreading
+##!/bin/sh
+#for vcpu in $(cat /sys/devices/system/cpu/cpu*/topology/thread_siblings_list | cut -s -d- -f2 | cut -d- -f2 | uniq); do
+#    echo "0" > "/sys/devices/system/cpu/cpu"$vcpu"/online"
+#done
+#EOT
+#  chmod 755 /root/lsf_hyperthreading
+#  command="/root/lsf_hyperthreading"
+#  sh $command && (crontab -l 2>/dev/null; echo "@reboot $command") | crontab -
+#fi
+#echo "EGO_DEFINE_NCPUS=${ego_define_ncpus}" >> "$LSF_CONF_FILE"
+#
+## Update lsf configuration
+#echo 'LSB_MC_DISABLE_HOST_LOOKUP=Y' >> "$LSF_CONF_FILE"
+#sed -i "s/LSF_LOCAL_RESOURCES/#LSF_LOCAL_RESOURCES/"  "$LSF_CONF_FILE"
+#echo "LSF_RSH=\"ssh -o 'PasswordAuthentication no' -o 'StrictHostKeyChecking no'\"" >> "$LSF_CONF_FILE"
+##sed -i "s/LSF_SERVER_HOSTS=.*/LSF_SERVER_HOSTS=\"$ManagementHostNames\"/g" "$LSF_CONF_FILE"
+#echo "LSF_SERVER_HOSTS=\"$mgmt_hostnames\"" >> "$LSF_CONF_FILE"
+#
+#cat << EOF > /etc/profile.d/lsf.sh
+#ls /opt/ibm/lsf_worker/conf/lsf.conf > /dev/null 2> /dev/null < /dev/null &
+##usleep 10000
+#PID=\$!
+#if kill -0 \$PID 2> /dev/null; then
+#  # lsf.conf is not accessible
+#  kill -KILL \$PID 2> /dev/null > /dev/null
+#  wait \$PID
+#else
+#  source /opt/ibm/lsf_worker/conf/profile.lsf
+#fi
+#PATHs=\`echo "\$PATH" | sed -e 's/:/\n/g'\`
+#for path in /usr/local/bin /usr/bin /usr/local/sbin /usr/sbin; do
+#  PATHs=\`echo "\$PATHs" | grep -v \$path\`
+#done
+#export PATH=/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:\`echo "\$PATHs" | paste -s -d :\`
+#EOF
+#
+##sed -i "s/^$HostIP .*/$HostIP $HostName/g" /opt/ibm/lsf/conf/hosts
+##for hostname in $mgmt_hostnames; do
+##  while ! grep "$hostname" "$LSF_HOSTS_FILE"; do
+##    echo "Waiting for $hostname to be added to LSF host file"
+##    sleep 5
+##  done
+##  echo "$hostname found in LSF host file"
+##done
+##cat $LSF_HOSTS_FILE >> /etc/hosts
+#
+## Create lsf.sudoers file to support single lsfstartup and lsfrestart command from management node
+## Create lsf.sudoers file to support single lsfstartup and lsfrestart command from management node
+#echo 'LSF_STARTUP_USERS="lsfadmin"' | sudo tee -a /etc/lsf1.sudoers
+#echo "LSF_STARTUP_PATH=$LSF_TOP_VERSION/linux3.10-glibc2.17-x86_64/etc/" | sudo tee -a /etc/lsf.sudoers
+#chmod 600 /etc/lsf.sudoers
+#ls -l /etc/lsf.sudoers
+#
+## Change LSF_CONF= value in lsf_daemons
+#cd /opt/ibm/lsf_worker/10.1/linux3.10-glibc2.17-x86_64/etc/
+#sed -i "s|/opt/ibm/lsf/|/opt/ibm/lsf_worker/|g" lsf_daemons
+#cd -
+#
+#sudo /opt/ibm/lsf/10.1/install/hostsetup --top="${LSF_TOP}" --setuid    ### WARNING: LSF_TOP may be unset here
+#echo "Added LSF administrators to start LSF daemons" >> $logfile
+#
+## Install LSF as a service and start up
+#/opt/ibm/lsf_worker/10.1/install/hostsetup --top="/opt/ibm/lsf_worker" --boot="y" --start="y" --dynamic 2>&1 >> $logfile
+#systemctl status lsfd
+#cat /opt/ibm/lsf/conf/hosts >> /etc/hosts
+
+
+# Setting up the LDAP configuration
 # Setting up the LDAP configuration
 if [ "$enable_ldap" = "true" ]; then
 
@@ -420,9 +616,6 @@ EOF
     fi
 fi
 
-#update lsf client ip address to LSF_HOSTS_FILE
-echo "$login_ip_address $login_hostname" >> $LSF_HOSTS_FILE
-# Startup lsf daemons
 systemctl status lsfd >> "$logfile"
 
 # Setting up the Metrics Agent
@@ -452,68 +645,5 @@ if [ "$observability_monitoring_on_compute_nodes_enable" = true ]; then
     echo "Metrics agent start skipped since monitoring provisioning is not enabled" >> "$logfile"
 fi
 
-# Setting up the IBM Cloud Logs
-if [ "$observability_logs_enable_for_compute" = true ]; then
-
-  echo "Configuring cloud logs for compute since observability logs for compute is enabled"
-  sudo cp /root/post-config.sh /opt/ibm
-  cd /opt/ibm
-
-  cat <<EOL > /etc/fluent-bit/fluent-bit.conf
-[SERVICE]
-  Flush                   1
-  Log_Level               info
-  Daemon                  off
-  Parsers_File            parsers.conf
-  Plugins_File            plugins.conf
-  HTTP_Server             On
-  HTTP_Listen             0.0.0.0
-  HTTP_Port               8081
-  Health_Check            On
-  HC_Errors_Count         1
-  HC_Retry_Failure_Count  1
-  HC_Period               30
-  storage.path            /fluent-bit/cache
-  storage.max_chunks_up   192
-  storage.metrics         On
-
-[INPUT]
-  Name                syslog
-  Path                /tmp/in_syslog
-  Buffer_Chunk_Size   32000
-  Buffer_Max_Size     64000
-  Receive_Buffer_Size 512000
-
-[INPUT]
-  Name              tail
-  Tag               *
-  Path              /opt/ibm/lsf_worker/log/*.log
-  Path_Key          file
-  Exclude_Path      /var/log/at/**
-  DB                /opt/ibm/lsf_worker/log/fluent-bit.DB
-  Buffer_Chunk_Size 32KB
-  Buffer_Max_Size   256KB
-  Skip_Long_Lines   On
-  Refresh_Interval  10
-  storage.type      filesystem
-  storage.pause_on_chunks_overlimit on
-
-[FILTER]
-  Name modify
-  Match *
-  Add subsystemName compute
-  Add applicationName lsf
-
-@INCLUDE output-logs-router-agent.conf
-EOL
-
-  sudo chmod +x post-config.sh
-  sudo ./post-config.sh -h $cloud_logs_ingress_private_endpoint -p "3443" -t "/logs/v1/singles" -a IAMAPIKey -k $VPC_APIKEY_VALUE --send-directly-to-icl -s true -i Production
-  sudo echo "2024-10-16T14:31:16+0000 INFO Testing IBM Cloud LSF Logs from compute: $this_hostname" >> /opt/ibm/lsf_worker/log/test.log
-  sudo logger -u /tmp/in_syslog my_ident my_syslog_test_message_from_compute:$this_hostname
-
-else
-  echo "Cloud Logs configuration skipped since observability logs for compute is not enabled"
-fi
 
 echo "END $(date '+%Y-%m-%d %H:%M:%S')" >> "$logfile"
