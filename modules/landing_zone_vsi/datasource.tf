@@ -27,7 +27,7 @@ data "ibm_is_instance_profile" "management_node" {
 }
 
 data "ibm_is_instance_profile" "worker_node" {
-  name = var.worker_node_instance_type
+  name = var.worker_node_instance_type[0].instance_type
 }
 
 data "ibm_is_ssh_key" "bastion" {

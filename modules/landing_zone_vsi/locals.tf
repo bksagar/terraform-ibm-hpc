@@ -15,8 +15,8 @@ locals {
   compute_ssh_keys              = [for name in var.compute_ssh_keys : data.ibm_is_ssh_key.compute[name].id]
   management_ssh_keys           = local.compute_ssh_keys
   ldap_enable                   = var.enable_ldap == true && var.ldap_server == "null" ? 1 : 0
-  enable_worker_vsi             = var.solution == "lsf" && var.worker_node_min_count >= 0 ? var.worker_node_min_count : 0
-  products                      = var.solution == "lsf" && var.enable_app_center ? "lsf,lsf-app-center" : "lsf"
+  #  enable_worker_vsi             = var.solution == "lsf" && var.worker_node_min_count >= 0 ? var.worker_node_min_count : 0
+  products = var.solution == "lsf" && var.enable_app_center ? "lsf,lsf-app-center" : "lsf"
 
   # Region and Zone calculations
   region = join("-", slice(split("-", var.zones[0]), 0, 2))
@@ -140,7 +140,6 @@ locals {
   mem_in_mb              = tonumber(data.ibm_is_instance_profile.worker_node.memory[0].value) * 1024
   rc_profile             = data.ibm_is_instance_profile.worker_node.name
 
-
   bastion_subnets        = var.bastion_subnets
   bastion_ssh_keys       = [for name in var.ssh_keys : data.ibm_is_ssh_key.bastion[name].id]
   ldap_server            = var.enable_ldap == true && var.ldap_server == "null" ? length(module.ldap_vsi) > 0 ? var.ldap_primary_ip[0] : null : var.ldap_server
@@ -202,4 +201,15 @@ locals {
     }
     if share.mount_path != "/mnt/lsf" && share.size != null && share.iops != null
   ]
+}
+
+locals {
+  flattened_worker_nodes = flatten([
+    for key, value in var.worker_node_instance_type : [
+      for idx in range(value.count) : {
+        instance_type = value.instance_type
+        prefix        = format("%s-%s-%d", local.worker_node_name, key, idx + 1)
+      }
+    ]
+  ])
 }

@@ -336,6 +336,7 @@ cat <<EOT > "$LSF_RC_IC_CONF"/ibmcloudgen2_templates.json
                 "mem": ["Numeric", "${rc_memInMB}"],
                 "icgen2host": ["Boolean", "1"]
             },
+            "crn": "${bootdrive_crn}",
             "imageId": "$imageID",
             "subnetId": "$subnetId",
             "vpcId": "$vpcID",
@@ -350,6 +351,36 @@ cat <<EOT > "$LSF_RC_IC_CONF"/ibmcloudgen2_templates.json
 }
 EOT
 
+
+#cat <<EOT > "$LSF_RC_IC_CONF"/ibmcloudgen2_templates.json
+#{
+#  templates = [
+#    for worker in var.worker_node_instance_type : {
+#      templateId    = "Template-${var.cluster_prefix}-${worker.instance_type}"
+#      maxNumber     = var.rc_max_num
+#      attributes    = {
+#        type       = ["String", "X86_64"],
+#        ncores     = ["Numeric", worker.count / 2],
+#        ncpus      = ["Numeric", var.hyperthreading ? worker.count : worker.count / 2],
+#        mem        = ["Numeric", floor((var.hyperthreading ? worker.count : worker.count / 2) * 16 * 1024 * 0.9)],
+#        icgen2host = ["Boolean", true]
+#      },
+#      "crn": "${bootdrive_crn}",
+#      "imageId": "$imageID",
+#      "subnetId": "$subnetId",
+#      "vpcId": "$vpcID"
+#      "vmType": "${rc_profile}"
+#      "securityGroupIds": ["${securityGroupID}"],
+#      "resourceGroupId": "$rc_rg",
+#      "sshkey_id": "$sshkey_ID",
+#      "region": "$regionName",
+#      "zone": "$zone",
+#      "vmType": worker.instance_type
+#    }
+#  ]
+#}
+#
+#EOT
 #  # 6. Create ibmcloudgen2_templates.json
 #  ibmcloudgen2_templates="$LSF_RC_IC_CONF/ibmcloudgen2_templates.json"
 #  # Incrementally build a json string
@@ -1255,7 +1286,7 @@ if [ "$observability_logs_enable_for_management" = true ]; then
   Plugins_File            plugins.conf
   HTTP_Server             On
   HTTP_Listen             0.0.0.0
-  HTTP_Port               8081
+  HTTP_Port               9090
   Health_Check            On
   HC_Errors_Count         1
   HC_Retry_Failure_Count  1

@@ -178,6 +178,7 @@ locals {
           endpoint_type = "public"
           force_delete  = true
           kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-key", var.prefix) : var.kms_key_name) : null
+          expire_rule   = null
         } : null,
         var.enable_vpc_flow_logs ? {
           name          = "vpc-flow-logs-bucket"
@@ -185,6 +186,11 @@ locals {
           endpoint_type = "public"
           force_delete  = true
           kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-slz-key", var.prefix) : var.kms_key_name) : null
+          expire_rule = {
+            days    = var.cos_expiration_days
+            enable  = true
+            rule_id = "bucket-expire-rule"
+          }
         } : null,
         var.enable_atracker ? {
           name          = "atracker-bucket"
@@ -192,6 +198,11 @@ locals {
           endpoint_type = "public"
           force_delete  = true
           kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-atracker-key", var.prefix) : var.kms_key_name) : null
+          expire_rule = {
+            days    = var.cos_expiration_days
+            enable  = true
+            rule_id = "bucket-expire-rule"
+          }
         } : null,
         var.observability_logs_enable ? {
           name          = "logs-data-bucket"
@@ -199,6 +210,11 @@ locals {
           endpoint_type = "public"
           force_delete  = true
           kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-logs-data-key", var.prefix) : var.kms_key_name) : null
+          expire_rule = {
+            days    = var.cos_expiration_days
+            enable  = true
+            rule_id = "bucket-expire-rule"
+          }
         } : null,
         var.observability_logs_enable ? {
           name          = "metrics-data-bucket"
@@ -206,13 +222,23 @@ locals {
           endpoint_type = "public"
           force_delete  = true
           kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-metrics-data-key", var.prefix) : var.kms_key_name) : null
+          expire_rule = {
+            days    = var.cos_expiration_days
+            enable  = true
+            rule_id = "bucket-expire-rule"
+          }
         } : null,
         var.scc_enable ? {
           name          = "scc-bucket"
           storage_class = "standard"
           endpoint_type = "public"
           force_delete  = true
-          kms_key       = null
+          kms_key       = var.key_management == "key_protect" ? (var.kms_key_name == null ? format("%s-scc-key", var.prefix) : var.kms_key_name) : null
+          expire_rule = {
+            days    = var.cos_expiration_days
+            enable  = true
+            rule_id = "bucket-expire-rule"
+          }
         } : null
       ]
     } : null
@@ -236,6 +262,7 @@ locals {
           endpoint_type = bucket.endpoint_type
           force_delete  = bucket.force_delete
           kms_key       = bucket.kms_key
+          expire_rule   = bucket.expire_rule
         }
         if bucket != null
       ]
@@ -261,6 +288,9 @@ locals {
     } : null,
     var.enable_atracker ? {
       name = format("%s-atracker-key", var.prefix)
+    } : null,
+    var.scc_enable ? {
+      name = format("%s-scc-key", var.prefix)
     } : null
     ] : [
     {

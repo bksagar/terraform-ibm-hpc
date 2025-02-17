@@ -87,3 +87,18 @@ output "ldap_ips" {
   description = "LDAP nodes have these IPs:"
   value       = local.print_extra_outputs ? local.ldap_private_ips : null
 }
+
+output "cloud_monitoring_url" {
+  value       = var.observability_monitoring_enable ? module.cloud_monitoring_instance_creation.cloud_monitoring_url : null
+  description = "IBM Cloud Monitoring URL"
+}
+
+output "cloud_logs_url" {
+  value       = (var.observability_logs_enable_for_management || var.observability_logs_enable_for_compute) ? module.cloud_monitoring_instance_creation.cloud_logs_url : null
+  description = "IBM Cloud Logs URL"
+}
+
+output "worker_node_min_count" {
+  description = "Provides the total number of count for the static worker node."
+  value       = local.total_worker_node_count
+}

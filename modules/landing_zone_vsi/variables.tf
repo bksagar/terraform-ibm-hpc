@@ -344,14 +344,20 @@ variable "app_center_high_availability" {
 variable "db_instance_info" {
   description = "The IBM Cloud Database for MySQL information required to reference the PAC database."
   type = object({
-    id            = string
-    adminuser     = string
-    adminpassword = string
-    hostname      = string
-    port          = number
-    certificate   = string
+    id          = string
+    admin_user  = string
+    hostname    = string
+    port        = number
+    certificate = string
   })
   default = null
+}
+
+variable "db_admin_password" {
+  type        = string
+  default     = null
+  sensitive   = true
+  description = "The IBM Cloud Database for MySQL password required to reference the PAC database."
 }
 
 variable "storage_security_group_id" {
@@ -450,18 +456,8 @@ variable "solution" {
 variable "ibm_customer_number" {
   type        = string
   sensitive   = true
-  default     = ""
+  default     = null
   description = "Comma-separated list of the IBM Customer Number(s) (ICN) that is used for the Bring Your Own License (BYOL) entitlement check. For more information on how to find your ICN, see [What is my IBM Customer Number (ICN)?](https://www.ibm.com/support/pages/what-my-ibm-customer-number-icn)."
-}
-
-variable "worker_node_min_count" {
-  type        = number
-  default     = 0
-  description = "The minimum number of worker nodes. This is the number of static worker nodes that will be provisioned at the time the cluster is created. If using NFS storage, enter a value in the range 0 - 500. If using Spectrum Scale storage, enter a value in the range 1 - 64. NOTE: Spectrum Scale requires a minimum of 3 compute nodes (combination of management-host, management-host-candidate, and worker nodes) to establish a [quorum](https://www.ibm.com/docs/en/spectrum-scale/5.1.5?topic=failure-quorum#nodequo) and maintain data consistency in the event of a node failure. Therefore, the minimum value of 1 may need to be larger if the value specified for management_node_count is less than 2."
-  validation {
-    condition     = 0 <= var.worker_node_min_count && var.worker_node_min_count <= 500
-    error_message = "Input \"worker_node_min_count\" must be >= 0 and <= 500."
-  }
 }
 
 variable "worker_node_max_count" {
@@ -473,9 +469,36 @@ variable "worker_node_max_count" {
     error_message = "Input \"worker_node_max_count must\" be >= 1 and <= 500."
   }
 }
+##############################################################################
+# Dedicated Host
+##############################################################################
+
+variable "enable_dedicated_host" {
+  type        = bool
+  default     = false
+  description = "Set this option to true to enable dedicated hosts for the VSI created for workload servers, with the default value set to false."
+}
+
+variable "dedicated_host_id" {
+  type        = string
+  description = "Dedicated Host for the worker nodes"
+  default     = null
+}
 
 variable "worker_node_instance_type" {
-  type        = string
-  default     = "bx2-4x16"
-  description = "Specify the virtual server instance profile type name to be used to create the worker nodes for the Spectrum LSF cluster. The worker nodes are the ones where the workload execution takes place and the choice should be made according to the characteristic of workloads. For choices on profile types, see [Instance Profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles&interface=ui). Note: If dedicated_host_enabled == true, available instance prefix (e.g., bx2 and cx2) can be limited depending on your target region. Check `ibmcloud target -r {region_name}; ibmcloud is dedicated-host-profiles."
+  type = list(object({
+    count         = number
+    instance_type = string
+  }))
+  description = "The minimum number of worker nodes refers to the static worker nodes provisioned during cluster creation. The solution supports various instance types, so specify the node count based on the requirements of each instance profile. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
+  default = [
+    {
+      count         = 3
+      instance_type = "bx2-4x16"
+    },
+    {
+      count         = 0
+      instance_type = "cx2-8x16"
+    }
+  ]
 }

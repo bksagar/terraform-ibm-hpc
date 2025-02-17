@@ -118,6 +118,12 @@ variable "enable_atracker" {
   description = "Enable Activity tracker on COS"
 }
 
+variable "cos_expiration_days" {
+  type        = number
+  default     = 30
+  description = "Specify the number of days after object creation to expire objects in COS buckets."
+}
+
 variable "enable_vpc_flow_logs" {
   type        = bool
   default     = true

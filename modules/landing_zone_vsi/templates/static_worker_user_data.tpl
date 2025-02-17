@@ -29,4 +29,7 @@ observability_monitoring_enable="${observability_monitoring_enable}"
 observability_monitoring_on_compute_nodes_enable="${observability_monitoring_on_compute_nodes_enable}"
 cloud_monitoring_access_key="${cloud_monitoring_access_key}"
 cloud_monitoring_ingestion_url="${cloud_monitoring_ingestion_url}"
+cloud_logs_ingress_private_endpoint="${cloud_logs_ingress_private_endpoint}"
+observability_logs_enable_for_compute="${observability_logs_enable_for_compute}"
+VPC_APIKEY_VALUE="${VPC_APIKEY_VALUE}"
 echo "END $(date '+%Y-%m-%d %H:%M:%S')" >> $logfile

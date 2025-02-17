@@ -6,12 +6,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/terraform-ibm-modules/ibmcloud-terratest-wrapper/testhelper"
 	utils "github.com/terraform-ibm-modules/terraform-ibm-hpc/utilities"
 	"golang.org/x/crypto/ssh"
 )
 
 // VerifyManagementNodeConfig verifies the configuration of a management node by performing various checks.
-// It checks the cluster ID, master name, Reservation ID, MTU, IP route, hyperthreading, LSF version, Run tasks and file mount.
+// It checks the cluster ID, master name, Reservation ID, MTU, IP route, hyperthreading, LSF version, solution, Run tasks and file mount.
 // The results of the checks are logged using the provided logger.
 func VerifyManagementNodeConfig(
 	t *testing.T,
@@ -20,21 +21,22 @@ func VerifyManagementNodeConfig(
 	expectedHyperthreadingStatus bool,
 	managementNodeIPList []string,
 	lsfVersion string,
+	solution string,
 	logger *utils.AggregatedLogger,
 ) {
-
-	// Verify cluster ID
+	// Verify Cluster ID
 	checkClusterIDErr := LSFCheckClusterID(t, sshMgmtClient, expectedClusterID, logger)
-	utils.LogVerificationResult(t, checkClusterIDErr, "check Cluster ID on management node", logger)
+	utils.LogVerificationResult(t, checkClusterIDErr, "Check Cluster ID on management node", logger)
 
-	// Verify master name
+	// Verify Master Name
 	checkMasterNameErr := LSFCheckMasterName(t, sshMgmtClient, expectedMasterName, logger)
-	utils.LogVerificationResult(t, checkMasterNameErr, "check Master name on management node", logger)
+	utils.LogVerificationResult(t, checkMasterNameErr, "Check Master Name on management node", logger)
 
-	// Verify Reservation ID
-	ReservationIDErr := HPCCheckReservationID(t, sshMgmtClient, expectedReservationID, logger)
-	utils.LogVerificationResult(t, ReservationIDErr, "check Reservation ID on management node", logger)
-
+	// Verify Reservation ID if the solution contains "hpc"
+	if strings.Contains(solution, "hpc") {
+		reservationIDErr := HPCCheckReservationID(t, sshMgmtClient, expectedReservationID, logger)
+		utils.LogVerificationResult(t, reservationIDErr, "Check Reservation ID on management node", logger)
+	}
 	// MTU check for management nodes
 	mtuCheckErr := LSFMTUCheck(t, sshMgmtClient, managementNodeIPList, logger)
 	utils.LogVerificationResult(t, mtuCheckErr, "MTU check on management node", logger)
@@ -286,11 +288,15 @@ func VerifyJobs(t *testing.T, sshClient *ssh.Client, jobCommand string, logger *
 
 }
 
-// VerifyFileShareEncryption verifies encryption settings for file shares.
-func VerifyFileShareEncryption(t *testing.T, apiKey, region, resourceGroup, clusterPrefix, keyManagement string, logger *utils.AggregatedLogger) {
+// VerifyFileShareEncryption checks the encryption settings for file shares and verifies CRN encryption.
+// It logs the results of both encryption checks for auditing purposes.
+func VerifyFileShareEncryption(t *testing.T, sshMgmtClient *ssh.Client, apiKey, region, resourceGroup, clusterPrefix, keyManagement string, managementNodeIPList []string, logger *utils.AggregatedLogger) {
 	// Validate encryption
 	encryptErr := VerifyEncryption(t, apiKey, region, resourceGroup, clusterPrefix, keyManagement, logger)
-	utils.LogVerificationResult(t, encryptErr, "encryption", logger)
+	utils.LogVerificationResult(t, encryptErr, "File share encryption validation failed", logger)
+
+	encryptCRNErr := VerifyEncryptionCRN(t, sshMgmtClient, keyManagement, managementNodeIPList, logger)
+	utils.LogVerificationResult(t, encryptCRNErr, "CRN encryption validation failed", logger)
 }
 
 // VerifyManagementNodeLDAPConfig performs various checks on a management node's LDAP configuration.
@@ -559,4 +565,114 @@ func ValidateCosServiceInstanceAndVpcFlowLogs(t *testing.T, apiKey, expectedZone
 	// Verify the VPC flow log details
 	flowLogsErr := ValidateFlowLogs(t, apiKey, expectedZone, expectedResourceGroup, clusterPrefix, logger)
 	utils.LogVerificationResult(t, flowLogsErr, "VPC flow logs check", logger)
+}
+
+// ValidateLSFLogs validates the log files in the shared folder and checks their status after a master node reboot.
+// It performs two main checks: verifying log files in the shared folder and ensuring the log files are intact after the reboot.
+// This ensures that LSF logs are available and up-to-date in LSF log-related scenarios.
+func ValidateLSFLogs(t *testing.T, sshClient *ssh.Client, apiKey, region, resourceGroup, bastionIP string, managementMasterNodeIPList []string, logger *utils.AggregatedLogger) {
+	// Check the log files in the shared folder for all nodes
+	err := LogFilesInSharedFolder(t, sshClient, logger)
+	utils.LogVerificationResult(t, err, "Log files in shared folder check", logger)
+
+	// Validate that log files are still available after the master node reboot
+	err = LogFilesAfterMasterReboot(t, sshClient, bastionIP, managementMasterNodeIPList[0], logger)
+	utils.LogVerificationResult(t, err, "Log files after master reboot check", logger)
+
+	// Reconnect to the management node after reboot
+	sshClient, connectionErr := utils.ConnectToHost(LSF_PUBLIC_HOST_NAME, bastionIP, LSF_PRIVATE_HOST_NAME, managementMasterNodeIPList[0])
+	if connectionErr != nil {
+		logger.Error(t, fmt.Sprintf("Failed to reconnect to the master via SSH after reboot: %s", connectionErr))
+		utils.LogVerificationResult(t, connectionErr, fmt.Sprintf("Failed to reconnect to the master via SSH after reboot: %s", connectionErr), logger)
+		return // Exit if SSH connection fails
+	}
+
+	// Validate the log files after the master node shutdown
+	err = LogFilesAfterMasterShutdown(t, sshClient, apiKey, region, resourceGroup, bastionIP, managementMasterNodeIPList, logger)
+	utils.LogVerificationResult(t, err, "Log files after master shutdown check", logger)
+}
+
+// ValidatePACHAOnManagementNodes validates the configuration of the PACHA application center.
+// It performs validation on both the management node and additional management nodes.
+
+func ValidatePACHAOnManagementNodes(t *testing.T, sshClient *ssh.Client, domainName, publicHostIP string, managementNodeIPList []string, logger *utils.AggregatedLogger) {
+
+	// Validate the application center configuration on the primary management node.
+	err := ValidatePACHAConfigOnManagementNode(t, sshClient, domainName, logger)
+	utils.LogVerificationResult(t, err, "Validation of application center configuration on the primary management node", logger)
+
+	// Validate the application center configuration on additional management nodes.
+	err = ValidatePACHAConfigOnManagementNodes(t, sshClient, publicHostIP, managementNodeIPList, domainName, logger)
+	utils.LogVerificationResult(t, err, "Validation of application center configuration on additional management nodes", logger)
+
+}
+
+// ValidatePACHAFailoverHealthCheckOnManagementNodes validates the failover functionality and configuration of the PACHA application center.
+// It performs validation on both the management node and additional management nodes to ensure failover functionality.
+
+func ValidatePACHAFailoverHealthCheckOnManagementNodes(t *testing.T, sshClient *ssh.Client, domainName, publicHostIP string, managementNodeIPList []string, logger *utils.AggregatedLogger) {
+
+	err := ValidatePACHAFailoverOnManagementNodes(t, sshClient, publicHostIP, managementNodeIPList, logger)
+	utils.LogVerificationResult(t, err, "Validation of application center configuration on additional management nodes", logger)
+}
+
+// ValidateDedicatedHost validates whether the dedicated host exists and is properly configured.
+// It calls the verifyDedicatedHost function to perform the actual validation and logs the result.
+func ValidateDedicatedHost(t *testing.T, apiKey, region, resourceGroup, clusterPrefix string, expectedWorkerNodeCount int, expectedDedicatedHostPresence bool, logger *utils.AggregatedLogger) {
+	// Perform dedicated host verification
+	err := verifyDedicatedHost(t, apiKey, region, resourceGroup, clusterPrefix, expectedWorkerNodeCount, expectedDedicatedHostPresence, logger)
+
+	// Log failure if verification fails
+	utils.LogVerificationResult(t, err, "Dedicated host verification", logger)
+
+}
+
+// It checks the service instance details, extracts relevant GUIDs, and ensures attachments are in the expected state.
+func ValidateSCCInstance(t *testing.T, apiKey, region, resourceGroup, clusterPrefix, sccInstanceRegion string, logger *utils.AggregatedLogger) {
+
+	err := VerifySCCInstance(t, apiKey, region, resourceGroup, clusterPrefix, sccInstanceRegion, logger)
+
+	// Log failure if verification fails
+	utils.LogVerificationResult(t, err, "Scc Instance verification", logger)
+
+}
+
+// VerifyCloudLogs validates the configuration and status of cloud logging services.
+// It checks the correctness of cloud logs URLs from Terraform outputs and validates logging services for management and compute nodes.
+// The function logs verification results for each step and handles errors gracefully.
+// Parameters include test context, SSH client, cluster details, and logging configuration.
+// The function does not return values but logs outcomes for validation steps.
+func VerifyCloudLogs(
+	t *testing.T,
+	sshClient *ssh.Client,
+	expectedSolution string,
+	LastTestTerraformOutputs map[string]interface{},
+	managementNodeIPList []string, staticWorkerNodeIPList []string,
+	isCloudLogsEnabledForManagement, isCloudLogsEnabledForCompute bool,
+	logger *utils.AggregatedLogger) {
+
+	// Verify cloud logs URL from Terraform outputs
+	err := VerifyCloudLogsURLFromTerraformOutput(t, LastTestTerraformOutputs, isCloudLogsEnabledForManagement, isCloudLogsEnabledForCompute, logger)
+	utils.LogVerificationResult(t, err, "cloud logs URL from Terraform outputs", logger)
+
+	// Verify Fluent Bit service for management nodes
+	mgmtErr := LSFFluentBitServiceForManagementNodes(t, sshClient, managementNodeIPList, isCloudLogsEnabledForManagement, logger)
+	utils.LogVerificationResult(t, mgmtErr, "Fluent Bit service for management nodes", logger)
+
+	// Verify Fluent Bit service for compute nodes
+	compErr := LSFFluentBitServiceForComputeNodes(t, sshClient, expectedSolution, staticWorkerNodeIPList, isCloudLogsEnabledForCompute, logger)
+	utils.LogVerificationResult(t, compErr, "Fluent Bit service for compute nodes", logger)
+
+}
+
+// ValidateDynamicNodeProfile validates the dynamic worker node profile by fetching it from Terraform variables
+// and comparing it against the expected profile obtained from IBM Cloud CLI.
+func ValidateDynamicNodeProfile(t *testing.T, apiKey, region, resourceGroup, clusterPrefix string, options *testhelper.TestOptions, logger *utils.AggregatedLogger) {
+
+	expectedDynamicWorkerProfile, expectedWorkerNodeProfileErr := utils.GetFirstWorkerNodeInstanceType(t, options.TerraformVars, logger)
+	utils.LogVerificationResult(t, expectedWorkerNodeProfileErr, "Fetching worker node profile", logger)
+
+	validateDynamicWorkerProfileErr := ValidateDynamicWorkerProfile(t, apiKey, region, resourceGroup, clusterPrefix, expectedDynamicWorkerProfile, logger)
+	utils.LogVerificationResult(t, validateDynamicWorkerProfileErr, "Validating dynamic worker node profile", logger)
+
 }

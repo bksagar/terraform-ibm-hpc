@@ -18,7 +18,6 @@ chage -I -1 -m 0 -M 99999 -E -1 -W 14 lsfadmin
 # Setup Hostname
 HostIP=$(hostname -I | awk '{print $1}')
 hostname=${cluster_prefix}-${HostIP//./-}
-this_hostname="$(hostname)"
 hostnamectl set-hostname "$hostname"
 
 echo "START $(date '+%Y-%m-%d %H:%M:%S')" >> $logfile
@@ -468,7 +467,7 @@ if [ "$observability_logs_enable_for_compute" = true ]; then
   Plugins_File            plugins.conf
   HTTP_Server             On
   HTTP_Listen             0.0.0.0
-  HTTP_Port               8081
+  HTTP_Port               9090
   Health_Check            On
   HC_Errors_Count         1
   HC_Retry_Failure_Count  1
@@ -509,8 +508,8 @@ EOL
 
   sudo chmod +x post-config.sh
   sudo ./post-config.sh -h $cloud_logs_ingress_private_endpoint -p "3443" -t "/logs/v1/singles" -a IAMAPIKey -k $VPC_APIKEY_VALUE --send-directly-to-icl -s true -i Production
-  sudo echo "2024-10-16T14:31:16+0000 INFO Testing IBM Cloud LSF Logs from compute: $this_hostname" >> /opt/ibm/lsf_worker/log/test.log
-  sudo logger -u /tmp/in_syslog my_ident my_syslog_test_message_from_compute:$this_hostname
+  sudo echo "2024-10-16T14:31:16+0000 INFO Testing IBM Cloud LSF Logs from compute: $hostname" >> /opt/ibm/lsf_worker/log/test.log
+  sudo logger -u /tmp/in_syslog my_ident my_syslog_test_message_from_compute:$hostname
 
 else
   echo "Cloud Logs configuration skipped since observability logs for compute is not enabled"

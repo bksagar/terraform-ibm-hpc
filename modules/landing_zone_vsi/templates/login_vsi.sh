@@ -228,8 +228,8 @@ if [ "$enable_ldap" = "true" ]; then
             systemctl restart sshd
 
             # Check if the SSL certificate file exists, then copy it to the correct location
-            # Retry finding SSL certificate with a maximum of 5 attempts and 5 seconds sleep between retries
-            for attempt in {1..5}; do
+            # Retry finding SSL certificate with a maximum of 100 attempts and 5 seconds sleep between retries
+            for attempt in {1..100}; do
                 if [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ]; then
                     echo "LDAP SSL cert found under /mnt/lsf/openldap/ldap_cacert.pem path" >> $logfile
                     mkdir -p /etc/openldap/certs
@@ -240,8 +240,8 @@ if [ "$enable_ldap" = "true" ]; then
                     sleep 5
                 fi
             done
-            # Exit if the SSL certificate is still not found after 5 attempts
-            [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ] || { echo "SSL cert not found after 5 attempts. Exiting." >> $logfile; exit 1; }
+            # Exit if the SSL certificate is still not found after 100 attempts
+            [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ] || { echo "SSL cert not found after 100 attempts. Exiting." >> $logfile; exit 1; }
 
             # Create and configure the SSSD configuration file for LDAP integration
             cat <<EOF > /etc/sssd/sssd.conf
@@ -325,8 +325,8 @@ EOF
         sudo sed -i '$ i\session required pam_mkhomedir.so skel=/etc/skel umask=0022\' /etc/pam.d/common-session
 
         # Check if the SSL certificate file exists, then copy it to the correct location
-        # Retry finding SSL certificate with a maximum of 5 attempts and 5 seconds sleep between retries
-        for attempt in {1..5}; do
+        # Retry finding SSL certificate with a maximum of 100 attempts and 5 seconds sleep between retries
+        for attempt in {1..100}; do
             if [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ]; then
                 echo "LDAP SSL cert found under /mnt/lsf/openldap/ldap_cacert.pem path" >> $logfile
                 mkdir -p /etc/ldap/certs
@@ -337,8 +337,8 @@ EOF
                 sleep 5
             fi
         done
-        # Exit if the SSL certificate is still not found after 5 attempts
-        [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ] || { echo "SSL cert not found after 5 attempts. Exiting." >> $logfile; exit 1; }
+        # Exit if the SSL certificate is still not found after 100 attempts
+        [ -f "/mnt/lsf/openldap/ldap_cacert.pem" ] || { echo "SSL cert not found after 100 attempts. Exiting." >> $logfile; exit 1; }
 
         # Create and configure the SSSD configuration file for LDAP integration on Ubuntu
         cat <<EOF > /etc/sssd/sssd.conf

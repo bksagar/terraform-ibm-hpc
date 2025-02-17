@@ -57,7 +57,7 @@ module "nfs_storage_sg" {
 module "management_vsi" {
   count                         = 1
   source                        = "terraform-ibm-modules/landing-zone-vsi/ibm"
-  version                       = "4.2.0"
+  version                       = "4.5.0"
   vsi_per_subnet                = 1
   create_security_group         = false
   security_group                = null
@@ -80,7 +80,7 @@ module "management_vsi" {
 module "management_candidate_vsi" {
   count                         = var.management_node_count - 1
   source                        = "terraform-ibm-modules/landing-zone-vsi/ibm"
-  version                       = "4.2.0"
+  version                       = "4.5.0"
   create_security_group         = false
   security_group                = null
   security_group_ids            = module.compute_sg[*].security_group_id
@@ -102,14 +102,14 @@ module "management_candidate_vsi" {
 }
 
 module "worker_vsi" {
-  count                         = local.enable_worker_vsi
+  count                         = length(local.flattened_worker_nodes)
   source                        = "terraform-ibm-modules/landing-zone-vsi/ibm"
-  version                       = "4.2.0"
+  version                       = "4.5.0"
   vsi_per_subnet                = 1
   create_security_group         = false
   security_group                = null
   image_id                      = local.compute_image_found_in_map ? local.new_compute_image_id : data.ibm_is_image.compute[0].id
-  machine_type                  = var.worker_node_instance_type
+  machine_type                  = local.flattened_worker_nodes[count.index].instance_type
   prefix                        = format("%s-%s", local.worker_node_name, count.index)
   resource_group_id             = var.resource_group
   enable_floating_ip            = false
@@ -122,13 +122,15 @@ module "worker_vsi" {
   kms_encryption_enabled        = var.kms_encryption_enabled
   skip_iam_authorization_policy = local.skip_iam_authorization_policy
   boot_volume_encryption_key    = var.boot_volume_encryption_key
+  enable_dedicated_host         = var.enable_dedicated_host
+  dedicated_host_id             = var.dedicated_host_id
   depends_on                    = [module.management_vsi, module.lsf_entitlement, module.do_management_vsi_configuration]
 }
 
 module "login_vsi" {
   #  count                         = 1
   source                        = "terraform-ibm-modules/landing-zone-vsi/ibm"
-  version                       = "4.2.0"
+  version                       = "4.5.0"
   vsi_per_subnet                = 1
   create_security_group         = false
   security_group                = null
@@ -152,7 +154,7 @@ module "login_vsi" {
 module "ldap_vsi" {
   count                         = local.ldap_enable
   source                        = "terraform-ibm-modules/landing-zone-vsi/ibm"
-  version                       = "4.2.0"
+  version                       = "4.5.0"
   vsi_per_subnet                = 1
   create_security_group         = false
   security_group                = null
@@ -243,7 +245,7 @@ module "lsf_entitlement" {
   login_host          = var.bastion_fip
   login_user          = "ubuntu"
   login_private_key   = var.bastion_private_key_content
-  command             = ["sudo python3.8 /opt/IBM/cloud_entitlement/entitlement_check.py --products ${local.products} --icns ${var.ibm_customer_number}"]
+  command             = ["sudo python3.8 /opt/IBM/cloud_entitlement/entitlement_check.py --products ${local.products} --icns ${var.ibm_customer_number != null ? var.ibm_customer_number : ""}"]
   depends_on = [
     module.management_vsi,
     module.wait_management_vsi_booted # this implies vsi have been configured too

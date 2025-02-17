@@ -40,7 +40,8 @@ locals {
   kms_encryption_enabled     = var.key_management == "key_protect" ? true : false
   boot_volume_encryption_key = var.key_management == "key_protect" ? one(module.landing_zone[0].boot_volume_encryption_key)["crn"] : null
   existing_kms_instance_guid = var.key_management == "key_protect" ? module.landing_zone[0].key_management_guid : null
-  cluster_id                 = local.region == "eu-de" || local.region == "us-east" || local.region == "us-south" ? var.cluster_id : "HPC-LSF-1"
+  #  cluster_id                 = local.region == "eu-de" || local.region == "us-east" || local.region == "us-south" ? var.cluster_id : "HPC-LSF-1"
+  total_worker_node_count = sum([for node in var.worker_node_instance_type : node.count])
 }
 
 # locals needed for landing_zone_vsi
@@ -292,4 +293,13 @@ locals {
 
 locals {
   allowed_cidr = concat(var.remote_allowed_ips, local.remote_allowed_ips_extra, local.add_current_ip_to_allowed_cidr ? module.my_ip.my_cidr : [])
+}
+
+locals {
+  profile_str = split("-", var.worker_node_instance_type[0].instance_type)
+  dh_profiles = var.enable_dedicated_host ? [
+    for p in data.ibm_is_dedicated_host_profiles.worker[0].profiles : p if p.class == local.profile_str[0]
+  ] : []
+  dh_profile_index = length(local.dh_profiles) == 0 ? "Profile class ${local.profile_str[0]} for dedicated hosts does not exist in ${local.region}.Check available class with `ibmcloud target -r ${local.region}; ibmcloud is dedicated-host-profiles` and retry with another worker_node_instance_type." : 0
+  dh_profile       = var.enable_dedicated_host ? local.dh_profiles[local.dh_profile_index] : null
 }

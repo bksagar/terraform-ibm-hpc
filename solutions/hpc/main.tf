@@ -5,6 +5,7 @@ module "landing_zone" {
   cos_instance_name             = var.cos_instance_name
   enable_atracker               = var.observability_atracker_enable && (var.observability_atracker_target_type == "cos") ? true : false
   enable_cos_integration        = var.enable_cos_integration
+  cos_expiration_days           = var.cos_expiration_days
   enable_vpc_flow_logs          = var.enable_vpc_flow_logs
   enable_vpn                    = var.vpn_enabled
   key_management                = var.key_management
@@ -62,7 +63,7 @@ module "db" {
   region            = data.ibm_is_region.region.name
   mysql_version     = local.mysql_version
   service_endpoints = local.db_service_endpoints
-  adminpassword     = "db-${module.generate_db_adminpassword[0].password}" # with a prefix so we start with a letter
+  admin_password    = "db-${module.generate_db_adminpassword[0].password}" # with a prefix so we start with a letter
   members           = local.db_template[0]
   memory            = local.db_template[1]
   disks             = local.db_template[2]
@@ -106,7 +107,7 @@ module "landing_zone_vsi" {
   app_center_gui_pwd                               = var.app_center_gui_pwd
   enable_app_center                                = var.enable_app_center
   contract_id                                      = var.reservation_id
-  cluster_id                                       = local.cluster_id
+  cluster_id                                       = var.cluster_id
   management_node_count                            = var.management_node_count
   management_node_instance_type                    = var.management_node_instance_type
   file_share                                       = length(local.valid_lsf_shares) > 0 ? module.file_storage.total_mount_paths : module.file_storage.mount_paths_excluding_first
@@ -127,6 +128,7 @@ module "landing_zone_vsi" {
   ldap_primary_ip                                  = local.ldap_private_ips
   app_center_high_availability                     = var.app_center_high_availability
   db_instance_info                                 = var.enable_app_center && var.app_center_high_availability ? module.db[0].db_instance_info : null
+  db_admin_password                                = var.enable_app_center && var.app_center_high_availability ? module.db[0].db_admin_password : null
   storage_security_group_id                        = var.storage_security_group_id
   observability_monitoring_enable                  = var.observability_monitoring_enable
   observability_monitoring_on_compute_nodes_enable = var.observability_monitoring_on_compute_nodes_enable
@@ -141,12 +143,14 @@ module "landing_zone_vsi" {
   observability_logs_enable_for_management         = var.observability_logs_enable_for_management
   observability_logs_enable_for_compute            = var.observability_logs_enable_for_compute
   solution                                         = var.solution
-  worker_node_min_count                            = var.worker_node_min_count
   worker_node_max_count                            = var.worker_node_max_count
   ibm_customer_number                              = var.ibm_customer_number
   worker_node_instance_type                        = var.worker_node_instance_type
+  enable_dedicated_host                            = var.enable_dedicated_host
+  dedicated_host_id                                = var.enable_dedicated_host && local.total_worker_node_count >= 1 ? module.dedicated_host[0].dedicated_host_id[0] : null
   depends_on = [
-    module.validate_ldap_server_connection
+    module.validate_ldap_server_connection,
+    module.dedicated_host
   ]
 }
 
@@ -430,7 +434,7 @@ module "cloud_monitoring_instance_creation" {
   rg                             = local.resource_groups["service_rg"]
   cloud_monitoring_provision     = var.observability_monitoring_enable
   observability_monitoring_plan  = var.observability_monitoring_plan
-  enable_platform_metrics        = var.observability_enable_platform_metrics
+  enable_metrics_routing         = var.observability_enable_metrics_routing
   enable_platform_logs           = var.observability_enable_platform_logs
   cluster_prefix                 = var.cluster_prefix
   cloud_monitoring_instance_name = "${var.cluster_prefix}-metrics"
@@ -450,7 +454,6 @@ module "scc_instance_and_profile" {
   location                = var.scc_location != "" ? var.scc_location : "us-south"
   rg                      = local.resource_groups["service_rg"]
   scc_profile             = var.scc_enable ? var.scc_profile : ""
-  scc_profile_version     = var.scc_profile != "" && var.scc_profile != null ? var.scc_profile_version : ""
   event_notification_plan = var.scc_event_notification_plan
   tags                    = ["hpc", var.cluster_prefix]
   prefix                  = var.cluster_prefix
@@ -460,4 +463,16 @@ module "scc_instance_and_profile" {
 
 module "my_ip" {
   source = "../../modules/my_ip"
+}
+
+module "dedicated_host" {
+  count               = var.enable_dedicated_host && local.total_worker_node_count >= 1 ? 1 : 0
+  source              = "../../modules/dedicated_host"
+  prefix              = var.cluster_prefix
+  zone                = var.zones
+  existing_host_group = false
+  class               = local.dh_profile.class
+  profile             = local.dh_profile.name
+  family              = local.dh_profile.family
+  resource_group_id   = local.resource_groups["workload_rg"]
 }

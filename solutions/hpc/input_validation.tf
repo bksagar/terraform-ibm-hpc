@@ -74,7 +74,7 @@ locals {
     "^${local.validate_reservation_id_api_msg}$",
   (local.validate_reservation_id_api ? local.validate_reservation_id_api_msg : ""))
 
-  validate_worker_count     = var.solution == "lsf" ? var.worker_node_min_count <= var.worker_node_max_count : true
+  validate_worker_count     = var.solution == "lsf" ? local.total_worker_node_count <= var.worker_node_max_count : true
   validate_worker_error_msg = "If the solution is set as lsf, the worker min count cannot be greater than worker max count."
   # tflint-ignore: terraform_unused_declarations
   validate_worker_count_chk = regex(

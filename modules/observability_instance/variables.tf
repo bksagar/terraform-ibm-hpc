@@ -70,8 +70,8 @@ variable "enable_platform_logs" {
   default     = true
 }
 
-variable "enable_platform_metrics" {
-  description = "Receive platform metrics in the provisioned IBM Cloud Monitoring instance."
+variable "enable_metrics_routing" {
+  description = "Enable metrics routing to manage metrics at the account-level by configuring targets and routes that define where data points are routed."
   type        = bool
   default     = false
 }

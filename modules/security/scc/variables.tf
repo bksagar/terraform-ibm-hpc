@@ -66,15 +66,8 @@ variable "scc_plan" {
 # SCC Instance Profile
 variable "scc_profile" {
   type        = string
-  default     = "CIS IBM Cloud Foundations Benchmark"
-  description = "Profile to be set on the SCC Instance (accepting empty, 'CIS IBM Cloud Foundations Benchmark' and 'IBM Cloud Framework for Financial Services')"
-}
-
-# SCC Instance Profile Version
-variable "scc_profile_version" {
-  type        = string
-  default     = "1.0.0"
-  description = "Version of Profile to be set on the SCC Instance"
+  default     = "CIS IBM Cloud Foundations Benchmark v1.1.0"
+  description = "Profile to be set on the SCC Instance (accepting empty, 'CIS IBM Cloud Foundations Benchmark v1.1.0' and 'IBM Cloud Framework for Financial Services')"
 }
 
 # SCC Scope Environment

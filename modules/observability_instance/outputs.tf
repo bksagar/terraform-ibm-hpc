@@ -29,3 +29,13 @@ output "cloud_logs_ingress_private_endpoint" {
   value       = var.cloud_logs_provision ? module.observability_instance.cloud_logs_ingress_private_endpoint : ""
   description = "The private ingress endpoint of the provisioned Cloud Logs instance."
 }
+
+output "cloud_monitoring_url" {
+  value       = var.cloud_monitoring_provision ? "https://cloud.ibm.com/observe/embedded-view/monitoring/${module.observability_instance.cloud_monitoring_guid}" : null
+  description = "IBM Cloud Monitoring URL"
+}
+
+output "cloud_logs_url" {
+  value       = var.cloud_logs_provision ? "https://dashboard.${var.location}.logs.cloud.ibm.com/${module.observability_instance.cloud_logs_guid}" : null
+  description = "IBM Cloud Logs URL"
+}

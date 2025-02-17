@@ -51,5 +51,30 @@ module "observability_instance" {
   cloud_monitoring_tags          = var.tags
 
   enable_platform_logs    = var.enable_platform_logs
-  enable_platform_metrics = var.enable_platform_metrics
+  enable_platform_metrics = false
+  metrics_router_targets = (var.enable_metrics_routing && var.cloud_monitoring_provision) ? [
+    {
+      destination_crn = module.observability_instance.cloud_monitoring_crn
+      target_region   = var.location
+      target_name     = "${var.cluster_prefix}-metrics-routing-target"
+    }
+  ] : []
+  metrics_router_routes = (var.enable_metrics_routing && var.cloud_monitoring_provision) ? [
+    {
+      name = "${var.cluster_prefix}-metrics-routing-route"
+      rules = [
+        {
+          action = "send"
+          targets = [{
+            id = module.observability_instance.metrics_router_targets["${var.cluster_prefix}-metrics-routing-target"].id
+          }]
+          inclusion_filters = [{
+            operand  = "location"
+            operator = "is"
+            values   = [var.location]
+          }]
+        }
+      ]
+    }
+  ] : []
 }

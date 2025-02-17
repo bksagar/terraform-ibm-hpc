@@ -75,6 +75,9 @@ data "template_file" "worker_user_data" {
     observability_monitoring_on_compute_nodes_enable = var.observability_monitoring_on_compute_nodes_enable
     cloud_monitoring_access_key                      = var.cloud_monitoring_access_key
     cloud_monitoring_ingestion_url                   = var.cloud_monitoring_ingestion_url
+    cloud_logs_ingress_private_endpoint              = var.cloud_logs_ingress_private_endpoint
+    observability_logs_enable_for_compute            = var.observability_logs_enable_for_compute
+    VPC_APIKEY_VALUE                                 = var.ibmcloud_api_key
   }
 }
 
@@ -126,8 +129,8 @@ data "template_file" "management_values" {
     login_hostname                = local.login_hostnames[0]
     # PAC High Availability
     app_center_high_availability = var.app_center_high_availability
-    db_adminuser                 = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.adminuser : ""
-    db_adminpassword             = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.adminpassword : ""
+    db_adminuser                 = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.admin_user : ""
+    db_adminpassword             = var.enable_app_center && var.app_center_high_availability ? var.db_admin_password : ""
     db_hostname                  = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.hostname : ""
     db_port                      = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.port : ""
     db_certificate               = var.enable_app_center && var.app_center_high_availability ? var.db_instance_info.certificate : ""
@@ -148,7 +151,6 @@ data "template_file" "management_values" {
     rc_ncores                                        = local.ncores
     rc_ncpus                                         = local.ncpus
     rc_mem_in_mb                                     = local.mem_in_mb
-    rc_profile                                       = local.rc_profile
     rc_profile                                       = local.rc_profile
   }
 }
