@@ -66,9 +66,6 @@
                             "required": true
                         },
                         {
-                            "key": "reservation_id"
-                        },
-                        {
                             "key": "cluster_id"
                         },
                         {
@@ -216,9 +213,6 @@
                         },
                         {
                             "key": "observability_enable_metrics_routing"
-                        },
-                        {
-                            "key": "enable_dedicated_host"
                         },
                         {
                             "key": "observability_enable_platform_logs"
@@ -491,6 +485,10 @@
                                 "original_grouping": "deployment",
                                 "type": "multiline_secure_value"
                             }
+                        },
+                        {
+                            "hidden": true,
+                            "key": "reservation_id"
                         },
                         {
                             "hidden": true,
