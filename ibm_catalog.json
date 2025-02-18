@@ -203,15 +203,6 @@
                             "key": "cluster_prefix"
                         },
                         {
-                            "key": "cos_expiration_days"
-                        },
-                        {
-                            "key": "enable_dedicated_host"
-                        },
-                        {
-                            "key": "ldap_server_cert"
-                        },
-                        {
                             "key": "observability_atracker_enable"
                         },
                         {
@@ -332,6 +323,9 @@
                             ]
                         },
                         {
+                            "key": "cos_expiration_days"
+                        },
+                        {
                             "key": "vpc_cidr"
                         },
                         {
@@ -368,9 +362,6 @@
                             "key": "login_image_name"
                         },
                         {
-                            "key": "solution"
-                        },
-                        {
                             "key": "worker_node_max_count"
                         },
                         {
@@ -392,9 +383,6 @@
                             }
                         },
                         {
-                            "key": "storage_security_group_id"
-                        },
-                        {
                             "key": "dns_instance_id"
                         },
                         {
@@ -410,12 +398,6 @@
                             "key": "cos_instance_name"
                         },
                         {
-                            "key": "enable_vpc_flow_logs"
-                        },
-                        {
-                            "key": "vpn_enabled"
-                        },
-                        {
                             "key": "key_management"
                         },
                         {
@@ -428,6 +410,18 @@
                             "key": "hyperthreading_enabled"
                         },
                         {
+                            "key": "storage_security_group_id"
+                        },
+                        {
+                            "key": "vpn_enabled"
+                        },
+                        {
+                            "key": "enable_vpc_flow_logs"
+                        },
+                        {
+                            "key": "enable_dedicated_host"
+                        },
+                        {
                             "key": "enable_fip"
                         },
                         {
@@ -438,6 +432,9 @@
                         },
                         {
                             "key": "app_center_high_availability"
+                        },
+                        {
+                            "key": "existing_certificate_instance"
                         },
                         {
                             "key": "enable_ldap"
@@ -464,6 +461,9 @@
                             "key": "ldap_vsi_osimage_name"
                         },
                         {
+                            "key": "ldap_server_cert"
+                        },
+                        {
                             "key": "skip_iam_authorization_policy"
                         },
                         {
@@ -471,9 +471,6 @@
                         },
                         {
                             "key": "skip_flowlogs_s2s_auth_policy"
-                        },
-                        {
-                            "key": "existing_certificate_instance"
                         },
                         {
                             "key": "bastion_instance_name"
@@ -494,6 +491,10 @@
                                 "original_grouping": "deployment",
                                 "type": "multiline_secure_value"
                             }
+                        },
+                        {
+                            "hidden": true,
+                            "key": "solution"
                         },
                         {
                             "hidden": true,
@@ -622,7 +623,7 @@
                             {
                                 "diagram": {
                                     "caption": "IBM Spectrum LSF",
-                                    "url": "https://raw.githubusercontent.com/bksagar/terraform-ibm-hpc/main/DA_LSF_BYOL_Arch.drawio.svg",
+                                    "url": "https://raw.githubusercontent.com/terraform-ibm-modules/terraform-ibm-hpc/main/DA_LSF_BYOL_Arch.drawio.svg",
                                     "type": "image/svg+xml"
                                 },
                                 "description": "This deployable architecture creates a VPC to run your HPC workload within a single zone from IBM Cloud. A login node is deployed in a separate subnet and security group to access your HPC environment. The HPC management nodes are in a different subnet and security group. In addition, clusters of virtual server instances are provisioned are pre-installed with the IBM Spectrum LSF scheduler for HPC workload job management. The IBM Spectrum LSF scheduler dynamically creates compute nodes and deletes them after job completion. Also, IBM Cloud File Storage for VPC is provisioned for configuration or data sharing between HPC management and compute nodes."
