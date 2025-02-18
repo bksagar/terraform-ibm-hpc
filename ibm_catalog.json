@@ -621,7 +621,7 @@
                             {
                                 "diagram": {
                                     "caption": "IBM Spectrum LSF",
-                                    "url": "https://raw.githubusercontent.com/terraform-ibm-modules/terraform-ibm-hpc/main/DA_LSF_BYOL_Arch.drawio.svg",
+                                    "url": "https://raw.githubusercontent.com/bksagar/terraform-ibm-hpc/main/DA_LSF_BYOL_Arch.drawio.svg",
                                     "type": "image/svg+xml"
                                 },
                                 "description": "This deployable architecture creates a VPC to run your HPC workload within a single zone from IBM Cloud. A login node is deployed in a separate subnet and security group to access your HPC environment. The HPC management nodes are in a different subnet and security group. In addition, clusters of virtual server instances are provisioned are pre-installed with the IBM Spectrum LSF scheduler for HPC workload job management. The IBM Spectrum LSF scheduler dynamically creates compute nodes and deletes them after job completion. Also, IBM Cloud File Storage for VPC is provisioned for configuration or data sharing between HPC management and compute nodes."
