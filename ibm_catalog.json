@@ -215,9 +215,6 @@
                             "key": "observability_enable_metrics_routing"
                         },
                         {
-                            "key": "enable_dedicated_host"
-                        },
-                        {
                             "key": "observability_enable_platform_logs"
                         },
                         {
