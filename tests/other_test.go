@@ -1376,6 +1376,126 @@ func TestRunObservabilityCloudLogsManagementAndComputeDisabled(t *testing.T) {
 	lsf.ValidateBasicClusterConfigurationWithCloudLogs(t, options, testLogger)
 }
 
+// TestRunObservabilityMonitoringForManagementAndComputeEnabled validates the creation of a cluster
+// with observability features enabled for both management and compute nodes. The test ensures that the
+// cluster setup passes basic validation checks, confirming that the observability features for both management
+// and compute are properly configured and functional, while platform logs and monitoring are disabled.
+func TestRunObservabilityMonitoringForManagementAndComputeEnabled(t *testing.T) {
+	// Run the test in parallel with other tests to optimize test execution
+	t.Parallel()
+
+	// Set up the test suite and environment configuration
+	setupTestSuite(t)
+
+	// Log the initiation of the cluster creation process
+	testLogger.Info(t, "Cluster creation process initiated for "+t.Name())
+
+	// Generate a random prefix for the cluster to ensure uniqueness
+	hpcClusterPrefix := utils.GenerateRandomString()
+
+	// Retrieve necessary environment variables to configure the test
+	envVars := GetEnvVars()
+
+	// Set up test options with relevant parameters, including resource group and environment variables
+	options, err := setupOptions(t, hpcClusterPrefix, terraformDir, envVars.DefaultResourceGroup, ignoreDestroys, ignoreUpdates)
+	require.NoError(t, err, "Error setting up test options: %v", err)
+
+	// Configure the observability settings for management and compute logs,
+	options.TerraformVars["observability_logs_enable_for_management"] = false
+	options.TerraformVars["observability_monitoring_enable"] = true
+	options.TerraformVars["observability_monitoring_on_compute_nodes_enable"] = true
+	options.TerraformVars["observability_monitoring_plan"] = "graduated-tier"
+
+	// Prevent automatic test teardown for inspection after the test runs
+	options.SkipTestTearDown = true
+
+	// Ensure test teardown is executed at the end of the test
+	defer options.TestTearDown()
+
+	// Validate that the basic cluster configuration is correct with cloud monitoring enabled for management and compute nodes
+	lsf.ValidateBasicClusterConfigurationWithCloudMonitoring(t, options, testLogger)
+}
+
+// TestRunObservabilityMonitoringForManagementEnabledAndComputeDisabled validates the creation of a cluster
+// with observability features enabled for both management and compute nodes. The test ensures that the
+// cluster setup passes basic validation checks, confirming that the observability features for both management
+// and compute are properly configured and functional, while platform logs and monitoring are disabled.
+func TestRunObservabilityMonitoringForManagementEnabledAndComputeDisabled(t *testing.T) {
+	// Run the test in parallel with other tests to optimize test execution
+	t.Parallel()
+
+	// Set up the test suite and environment configuration
+	setupTestSuite(t)
+
+	// Log the initiation of the cluster creation process
+	testLogger.Info(t, "Cluster creation process initiated for "+t.Name())
+
+	// Generate a random prefix for the cluster to ensure uniqueness
+	hpcClusterPrefix := utils.GenerateRandomString()
+
+	// Retrieve necessary environment variables to configure the test
+	envVars := GetEnvVars()
+
+	// Set up test options with relevant parameters, including resource group and environment variables
+	options, err := setupOptions(t, hpcClusterPrefix, terraformDir, envVars.DefaultResourceGroup, ignoreDestroys, ignoreUpdates)
+	require.NoError(t, err, "Error setting up test options: %v", err)
+
+	// Configure the observability settings for management and compute logs,
+	options.TerraformVars["observability_logs_enable_for_management"] = false
+	options.TerraformVars["observability_monitoring_enable"] = true
+	options.TerraformVars["observability_monitoring_on_compute_nodes_enable"] = false
+	options.TerraformVars["observability_monitoring_plan"] = "graduated-tier"
+
+	// Prevent automatic test teardown for inspection after the test runs
+	options.SkipTestTearDown = true
+
+	// Ensure test teardown is executed at the end of the test
+	defer options.TestTearDown()
+
+	// Validate that the basic cluster configuration is correct with cloud monitoring enabled for management and compute nodes
+	lsf.ValidateBasicClusterConfigurationWithCloudMonitoring(t, options, testLogger)
+}
+
+// TestRunObservabilityMonitoringForManagementAndComputeDisabled validates the creation of a cluster
+// with observability features enabled for both management and compute nodes. The test ensures that the
+// cluster setup passes basic validation checks, confirming that the observability features for both management
+// and compute are properly configured and functional, while platform logs and monitoring are disabled.
+func TestRunObservabilityMonitoringForManagementAndComputeDisabled(t *testing.T) {
+	// Run the test in parallel with other tests to optimize test execution
+	t.Parallel()
+
+	// Set up the test suite and environment configuration
+	setupTestSuite(t)
+
+	// Log the initiation of the cluster creation process
+	testLogger.Info(t, "Cluster creation process initiated for "+t.Name())
+
+	// Generate a random prefix for the cluster to ensure uniqueness
+	hpcClusterPrefix := utils.GenerateRandomString()
+
+	// Retrieve necessary environment variables to configure the test
+	envVars := GetEnvVars()
+
+	// Set up test options with relevant parameters, including resource group and environment variables
+	options, err := setupOptions(t, hpcClusterPrefix, terraformDir, envVars.DefaultResourceGroup, ignoreDestroys, ignoreUpdates)
+	require.NoError(t, err, "Error setting up test options: %v", err)
+
+	// Configure the observability settings for management and compute logs,
+	options.TerraformVars["observability_logs_enable_for_management"] = false
+	options.TerraformVars["observability_monitoring_enable"] = true
+	options.TerraformVars["observability_monitoring_on_compute_nodes_enable"] = false
+	options.TerraformVars["observability_monitoring_plan"] = "graduated-tier"
+
+	// Prevent automatic test teardown for inspection after the test runs
+	options.SkipTestTearDown = true
+
+	// Ensure test teardown is executed at the end of the test
+	defer options.TestTearDown()
+
+	// Validate that the basic cluster configuration is correct with cloud monitoring enabled for management and compute nodes
+	lsf.ValidateBasicClusterConfigurationWithCloudMonitoring(t, options, testLogger)
+}
+
 // ############################## Negative Test cases ##########################################
 
 // TestRunHPCWithoutMandatory tests Terraform's behavior when mandatory variables are missing by checking for specific error messages.

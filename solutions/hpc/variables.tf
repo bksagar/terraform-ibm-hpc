@@ -3,7 +3,7 @@
 ##############################################################################
 
 variable "ibmcloud_api_key" {
-  description = "IBM Cloud API key for the IBM Cloud account where the IBM Cloud HPC cluster needs to be deployed. For more information on how to create an API key, see [Managing user API keys](https://cloud.ibm.com/docs/account?topic=account-userapikey)."
+  description = "IBM Cloud API key for the IBM Cloud account where the IBM Spectrum LSF cluster needs to be deployed. For more information on how to create an API key, see [Managing user API keys](https://cloud.ibm.com/docs/account?topic=account-userapikey)."
   type        = string
   sensitive   = true
   validation {
@@ -150,7 +150,7 @@ variable "vpc_cluster_login_private_subnets_cidr_blocks" {
 
 variable "remote_allowed_ips" {
   type        = list(string)
-  description = "Comma-separated list of IP addresses that can access the IBM Cloud HPC cluster instance through an SSH interface. For security purposes, provide the public IP addresses assigned to the devices that are authorized to establish SSH connections (for example, [\"169.45.117.34\"]). To fetch the IP address of the device, use [https://ipv4.icanhazip.com/](https://ipv4.icanhazip.com/)."
+  description = "Comma-separated list of IP addresses that can access the IBM Spectrum LSF cluster instance through an SSH interface. For security purposes, provide the public IP addresses assigned to the devices that are authorized to establish SSH connections (for example, [\"169.45.117.34\"]). To fetch the IP address of the device, use [https://ipv4.icanhazip.com/](https://ipv4.icanhazip.com/)."
   validation {
     condition = alltrue([
       for o in var.remote_allowed_ips : !contains(["0.0.0.0/0", "0.0.0.0"], o)
@@ -182,7 +182,7 @@ variable "compute_ssh_keys" {
 variable "login_node_instance_type" {
   type        = string
   default     = "bx2-2x8"
-  description = "Specify the virtual server instance profile type to be used to create the login node for the IBM Cloud HPC cluster. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
+  description = "Specify the virtual server instance profile type to be used to create the login node for the IBM Spectrum LSF cluster. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
   validation {
     condition     = can(regex("^[^\\s]+-[0-9]+x[0-9]+", var.login_node_instance_type))
     error_message = "The profile must be a valid profile name."
@@ -219,7 +219,7 @@ variable "management_node_instance_type" {
 
 variable "management_node_count" {
   type        = number
-  default     = 3
+  default     = 2
   description = "Specify the total number of management nodes, with a value between 1 and 10."
   validation {
     condition     = 1 <= var.management_node_count && var.management_node_count <= 10
@@ -263,7 +263,7 @@ variable "custom_file_shares" {
     nfs_share  = optional(string)
   }))
   default     = [{ mount_path = "/mnt/vpcstorage/tools", size = 100, iops = 2000 }, { mount_path = "/mnt/vpcstorage/data", size = 100, iops = 6000 }, { mount_path = "/mnt/scale/tools", nfs_share = "" }]
-  description = "Provide details for customizing your shared file storage layout, including mount points, sizes in GB, and IOPS ranges for up to five file shares. Each file share size in GB supports a different IOPS range. If the cluster requires creating more than 256 dynamic nodes, only provide the details of the NFS share and use \"/mnt/lsf\" as the mount path for the internal file share. If not, a default VPC file share will be created, which supports up to 256 nodes. For more information, see [file share IOPS value](https://cloud.ibm.com/docs/vpc?topic=vpc-file-storage-profiles&interface=ui)."
+  description = "Provide details for customizing your shared file storage layout, including mount points, sizes (in GB), and IOPS ranges for up to five file shares if using VPC file storage as the storage option.If using IBM Storage Scale as an NFS mount, update the appropriate mount path and nfs_share values created from the Storage Scale cluster. Note that VPC file storage supports attachment to a maximum of 256 nodes. Exceeding this limit may result in mount point failures due to attachment restrictions.For more information, see [Storage options](https://test.cloud.ibm.com/docs/hpc-ibm-spectrumlsf?topic=hpc-ibm-spectrumlsf-integrating-scale#integrate-scale-and-hpc)."
   validation {
     condition     = length([for item in var.custom_file_shares : item if item.nfs_share == null]) <= 5
     error_message = "The VPC storage custom file share count \"custom_file_shares\" must be less than or equal to 5. Unlimited NFS mounts are allowed."
@@ -306,9 +306,6 @@ variable "dns_domain_name" {
   description = "IBM Cloud DNS Services domain name to be used for the IBM Spectrum LSF cluster."
   validation {
     condition = can(regex("^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9])\\.com$", var.dns_domain_name.compute))
-    #condition = can(regex("^([a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]\\.)+[a-zA-Z]{2,6}$", var.dns_domain_names.compute))
-    #condition = can(regex("^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.[a-zA-Z]{2,6}$", var.dns_domain_names.compute))
-    #condition     = can(regex("^([[:alnum:]]*[A-Za-z0-9-]{1,63}\\.)+[A-Za-z]{2,6}$", var.dns_domain_names.compute))
     error_message = "The domain name provided for compute is not a fully qualified domain name (FQDN). An FQDN can contain letters (a-z, A-Z), digits (0-9), hyphens (-), dots (.), and must start and end with an alphanumeric character."
   }
 }
@@ -535,7 +532,7 @@ variable "enable_fip" {
 variable "enable_ldap" {
   type        = bool
   default     = false
-  description = "Set this option to true to enable LDAP for IBM Cloud HPC, with the default value set to false."
+  description = "Set this option to true to enable LDAP for IBM Spectrum LSF, with the default value set to false."
 }
 
 variable "ldap_basedns" {
@@ -580,7 +577,7 @@ variable "ldap_user_password" {
 variable "ldap_vsi_profile" {
   type        = string
   default     = "cx2-2x4"
-  description = "Specify the virtual server instance profile type to be used to create the ldap node for the IBM Cloud HPC cluster. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
+  description = "Specify the virtual server instance profile type to be used to create the ldap node for the IBM Spectrum LSF cluster. For choices on profile types, see [Instance profiles](https://cloud.ibm.com/docs/vpc?topic=vpc-profiles)."
 }
 
 variable "ldap_vsi_osimage_name" {
@@ -589,28 +586,28 @@ variable "ldap_vsi_osimage_name" {
   description = "Image name to be used for provisioning the LDAP instances. By default ldap server are created on Ubuntu based OS flavour."
 }
 
-variable "skip_iam_authorization_policy" {
+variable "skip_iam_block_storage_authorization_policy" {
   type        = bool
   default     = false
-  description = "Set to false if authorization policy is required for VPC block storage volumes to access kms. This can be set to true if authorization policy already exists. For more information on how to create authorization policy manually, see [creating authorization policies for block storage volume](https://cloud.ibm.com/docs/vpc?topic=vpc-block-s2s-auth&interface=ui)."
+  description = "When using an existing KMS instance name, set this value to true if authorization is already enabled between KMS instance and the block storage volume. Otherwise, default is set to false. Ensuring proper authorization avoids access issues during deployment.For more information on how to create authorization policy manually, see [creating authorization policies for block storage volume](https://cloud.ibm.com/docs/vpc?topic=vpc-block-s2s-auth&interface=ui)."
 }
 
 variable "skip_iam_share_authorization_policy" {
   type        = bool
   default     = false
-  description = "Set it to false if authorization policy is required for VPC file share to access kms. This can be set to true if authorization policy already exists. For more information on how to create authorization policy manually, see [creating authorization policies for VPC file share](https://cloud.ibm.com/docs/vpc?topic=vpc-file-s2s-auth&interface=ui)."
+  description = "When using an existing KMS instance name, set this value to true if authorization is already enabled between KMS instance and the VPC file share. Otherwise, default is set to false. Ensuring proper authorization avoids access issues during deployment.For more information on how to create authorization policy manually, see [creating authorization policies for VPC file share](https://cloud.ibm.com/docs/vpc?topic=vpc-file-s2s-auth&interface=ui)."
 }
 
 variable "skip_flowlogs_s2s_auth_policy" {
   type        = bool
   default     = false
-  description = "Skip auth policy between flow logs service and COS instance, set to true if this policy is already in place on account."
+  description = "When using an existing COS instance, set this value to true if authorization is already enabled between COS instance and the flow logs service. Otherwise, default is set to false. Ensuring proper authorization avoids access issues during deployment."
 }
 
 ###########################################################################
 # IBM Cloud ALB Variables
 ###########################################################################
-variable "existing_certificate_instance" {
+variable "app_center_existing_certificate_instance" {
   description = "When app_center_high_availability is enable/set as true, The Application Center will be configured for high availability and requires a Application Load Balancer Front End listener to use a certificate CRN value stored in the Secret Manager. Provide the valid 'existing_certificate_instance' to configure the Application load balancer."
   type        = string
   default     = ""
@@ -623,7 +620,7 @@ variable "existing_certificate_instance" {
 # tflint-ignore: all
 variable "TF_VERSION" {
   type        = string
-  default     = "1.5"
+  default     = "1.9"
   description = "The version of the Terraform engine that's used in the Schematics workspace."
 }
 
@@ -652,25 +649,25 @@ variable "TF_VALIDATION_SCRIPT_FILES" {
 # Existing Bastion Support variables
 ###########################################################################
 
-variable "bastion_instance_name" {
+variable "existing_bastion_instance_name" {
   type        = string
   default     = null
   description = "Provide the name of the bastion instance. If none given then new bastion will be created."
 }
 
-variable "bastion_instance_public_ip" {
+variable "existing_bastion_instance_public_ip" {
   type        = string
   default     = null
   description = "Provide the public ip address of the bastion instance to establish the remote connection."
 }
 
-variable "bastion_security_group_id" {
+variable "existing_bastion_security_group_id" {
   type        = string
   default     = null
   description = "Specify the security group ID for the bastion server. This ID will be added as an allowlist rule on the HPC cluster nodes to facilitate secure SSH connections through the bastion node. By restricting access through a bastion server, this setup enhances security by controlling and monitoring entry points into the cluster environment. Ensure that the specified security group is correctly configured to permit only authorized traffic for secure and efficient management of cluster resources."
 }
 
-variable "bastion_ssh_private_key" {
+variable "existing_bastion_ssh_private_key" {
   type        = string
   sensitive   = true
   default     = null

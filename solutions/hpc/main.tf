@@ -39,10 +39,10 @@ module "bootstrap" {
   kms_encryption_enabled        = local.kms_encryption_enabled
   boot_volume_encryption_key    = local.boot_volume_encryption_key
   existing_kms_instance_guid    = local.existing_kms_instance_guid
-  skip_iam_authorization_policy = var.skip_iam_authorization_policy
-  bastion_instance_name         = var.bastion_instance_name
+  skip_iam_authorization_policy = var.skip_iam_block_storage_authorization_policy
+  bastion_instance_name         = var.existing_bastion_instance_name
   bastion_instance_public_ip    = local.bastion_instance_public_ip
-  bastion_security_group_id     = var.bastion_instance_name != null ? var.bastion_security_group_id : null
+  bastion_security_group_id     = var.existing_bastion_instance_name != null ? var.existing_bastion_security_group_id : null
   ldap_server                   = var.ldap_server
 }
 
@@ -136,7 +136,7 @@ module "landing_zone_vsi" {
   cloud_monitoring_ingestion_url                   = var.observability_monitoring_enable ? module.cloud_monitoring_instance_creation.cloud_monitoring_ingestion_url : ""
   cloud_monitoring_prws_key                        = var.observability_monitoring_enable ? module.cloud_monitoring_instance_creation.cloud_monitoring_prws_key : ""
   cloud_monitoring_prws_url                        = var.observability_monitoring_enable ? module.cloud_monitoring_instance_creation.cloud_monitoring_prws_url : ""
-  bastion_instance_name                            = var.bastion_instance_name
+  bastion_instance_name                            = var.existing_bastion_instance_name
   ce_project_guid                                  = module.ce_project.guid
   existing_kms_instance_guid                       = local.existing_kms_instance_guid
   cloud_logs_ingress_private_endpoint              = local.cloud_logs_ingress_private_endpoint
@@ -186,7 +186,7 @@ module "alb" {
   prefix               = var.cluster_prefix
   security_group_ids   = concat(local.compute_security_group_id, [local.bastion_security_group_id])
   vsi_ids              = local.vsi_management_ids
-  certificate_instance = var.enable_app_center && var.app_center_high_availability ? var.existing_certificate_instance : ""
+  certificate_instance = var.enable_app_center && var.app_center_high_availability ? var.app_center_existing_certificate_instance : ""
   create_load_balancer = !local.alb_created_by_api && var.app_center_high_availability && var.enable_app_center
 }
 
@@ -199,7 +199,7 @@ module "alb_api" {
   prefix               = var.cluster_prefix
   security_group_ids   = concat(local.compute_security_group_id, [local.bastion_security_group_id])
   vsi_ips              = concat([local.management_private_ip], local.management_candidate_private_ips)
-  certificate_instance = var.enable_app_center && var.app_center_high_availability ? var.existing_certificate_instance : ""
+  certificate_instance = var.enable_app_center && var.app_center_high_availability ? var.app_center_existing_certificate_instance : ""
   create_load_balancer = local.alb_created_by_api && var.app_center_high_availability && var.enable_app_center
 }
 

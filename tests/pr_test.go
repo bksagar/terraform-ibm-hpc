@@ -47,6 +47,14 @@ var ignoreDestroys = []string{
 	"module.landing_zone_vsi[0].module.wait_worker_vsi_booted[0].null_resource.remote_exec[0]",
 	"module.check_node_status.null_resource.remote_exec[2]",
 	"module.landing_zone_vsi[0].module.wait_worker_vsi_booted[0].null_resource.remote_exec[1]",
+	"module.landing_zone_vsi[0].module.do_management_candidate_vsi_configuration.null_resource.remote_exec_script_new_file[0]",
+	"module.landing_zone_vsi[0].module.do_management_candidate_vsi_configuration.null_resource.remote_exec_script_run[0]",
+	"module.landing_zone_vsi[0].module.do_management_vsi_configuration.null_resource.remote_exec_script_cp_files[1]",
+	"module.landing_zone_vsi[0].module.do_management_vsi_configuration.null_resource.remote_exec_script_run[0]",
+	"module.landing_zone_vsi[0].module.do_management_vsi_configuration.null_resource.remote_exec_script_new_file[0]",
+	"module.landing_zone_vsi[0].module.do_management_candidate_vsi_configuration.null_resource.remote_exec_script_cp_files[0]",
+	"module.landing_zone_vsi[0].module.do_management_vsi_configuration.null_resource.remote_exec_script_cp_files[0]",
+	"",
 }
 
 var ignoreUpdates = []string{

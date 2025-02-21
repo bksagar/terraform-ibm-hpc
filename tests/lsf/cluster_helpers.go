@@ -676,3 +676,32 @@ func ValidateDynamicNodeProfile(t *testing.T, apiKey, region, resourceGroup, clu
 	utils.LogVerificationResult(t, validateDynamicWorkerProfileErr, "Validating dynamic worker node profile", logger)
 
 }
+
+// VerifyCloudMonitoring checks the cloud monitoring configuration and status.
+// It validates cloud log URLs from Terraform outputs and monitoring services
+// for management and compute nodes. The function logs verification results
+// and handles errors gracefully. It takes test context, SSH client, cluster
+// details, monitoring flags, and a logger as parameters. No values are
+// returned; only validation outcomes are logged.
+func VerifyCloudMonitoring(
+	t *testing.T,
+	sshClient *ssh.Client,
+	expectedSolution string,
+	LastTestTerraformOutputs map[string]interface{},
+	managementNodeIPList []string, staticWorkerNodeIPList []string,
+	isCloudMonitoringEnabledForManagement, isCloudMonitoringEnabledForCompute bool,
+	logger *utils.AggregatedLogger) {
+
+	// Verify cloud logs URL from Terraform outputs
+	err := VerifycloudMonitoringURLFromTerraformOutput(t, LastTestTerraformOutputs, isCloudMonitoringEnabledForManagement, isCloudMonitoringEnabledForCompute, logger)
+	utils.LogVerificationResult(t, err, "cloud logs URL from Terraform outputs", logger)
+
+	// Verify Prometheus Dragent service for management nodes
+	mgmtErr := LSFPrometheusAndDragentServiceForManagementNodes(t, sshClient, managementNodeIPList, isCloudMonitoringEnabledForManagement, logger)
+	utils.LogVerificationResult(t, mgmtErr, "Prometheus and Dragent service for management nodes", logger)
+
+	// Verify Prometheus Dragent service for compute nodes
+	compErr := LSFPrometheusAndDragentServiceForComputeNodes(t, sshClient, expectedSolution, staticWorkerNodeIPList, isCloudMonitoringEnabledForCompute, logger)
+	utils.LogVerificationResult(t, compErr, "Prometheus and Dragent service for compute nodes", logger)
+
+}

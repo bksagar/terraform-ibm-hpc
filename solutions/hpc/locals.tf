@@ -280,10 +280,10 @@ locals {
 # Existing bastion Variables
 locals {
   # bastion_instance_name      = var.bastion_instance_name != null ? var.bastion_instance_name : null
-  bastion_instance_public_ip = var.bastion_instance_name != null ? var.bastion_instance_public_ip : null
+  bastion_instance_public_ip = var.existing_bastion_instance_name != null ? var.existing_bastion_instance_public_ip : null
   # bastion_security_group_id  = var.bastion_instance_name != null ? var.bastion_security_group_id : module.bootstrap.bastion_security_group_id
-  bastion_ssh_private_key = var.bastion_instance_name != null ? var.bastion_ssh_private_key : null
-  bastion_instance_status = var.bastion_instance_name != null ? false : true
+  bastion_ssh_private_key = var.existing_bastion_instance_name != null ? var.existing_bastion_ssh_private_key : null
+  bastion_instance_status = var.existing_bastion_instance_name != null ? false : true
   existing_subnet_cidrs   = var.vpc_name != null && length(var.cluster_subnet_ids) == 1 ? [data.ibm_is_subnet.existing_subnet[0].ipv4_cidr_block, data.ibm_is_subnet.existing_login_subnet[0].ipv4_cidr_block, local.vpc_cidr] : []
 }
 
