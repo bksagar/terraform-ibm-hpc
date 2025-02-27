@@ -3,7 +3,7 @@
         {
             "name": "deploy-arch-ibm-hpc-lsf",
             "label": "HPC LSF",
-            "product_kind": "Deployable architecture",
+            "product_kind": "solution",
             "tags": [
                 "Deployable Architecture",
                 "DA",
