@@ -14,7 +14,7 @@
   "template_data": [
     {
       "folder": "solutions/hpc",
-      "type": "terraform_v1.5",
+      "type": "terraform_v1.9",
       "env_values":[
         {
           "TF_CLI_ARGS_apply": "-parallelism=250"
@@ -77,18 +77,11 @@
           "description": "The prefix is used to name the IBM Cloud LSF cluster and the resources provisioned to build the  cluster instance. Each Spectrum LSF cluster must have a unique name, so ensure the prefix is distinct. It must begin with a lowercase letter and can only include lowercase letters, digits, and hyphens. Hyphens must be followed by a lowercase letter or digit, with no leading, trailing, or consecutive hyphens. The prefix length must be less than 16 characters."
         },
         {
-          "name": "cluster_id",
+          "name": "cluster_name",
           "value": "Please fill here",
           "type": "string",
           "secure": false,
-          "description": "The unique cluster ID used by LSF to configure resources can be up to 39 alphanumeric characters, including underscores (_), hyphens (-), and periods (.). Spaces and other special characters are not allowed. Avoid using the name of any host or user as the cluster ID. Note that the cluster ID cannot be changed after deployment."
-        },
-        {
-          "name": "reservation_id",
-          "value": "__NULL__",
-          "type": "string",
-          "secure": true,
-          "description": "Ensure that you have received the reservation ID from IBM technical sales. Reservation ID is a unique identifier to distinguish different IBM Cloud HPC service agreements. It must start with a letter and can only contain letters, numbers, hyphens (-), or underscores (_)."
+          "description": "Provide a unique cluster name that LSF uses to configure and group the cluster. Without this name, LSF cannot form a cluster, and the initial deployments will fail. The cluster name can be up to 39 alphanumeric characters and may include underscores (_), hyphens (-), and periods (.). Spaces and other special characters are not allowed. Avoid using the name of any host or user as the cluster name. Note that the cluster name cannot be changed after deployment."
         },
         {
           "name": "ibm_customer_number",
@@ -102,14 +95,14 @@
           "value": "[\"Please fill here\"]",
           "type": "list(string)",
           "secure": false,
-          "description": "Provide the list of SSH key names configured in your IBM Cloud account to establish a connection to the Spectrum LSF bastion and login node. Ensure the SSH key is present in the same resource group and region where the cluster is being provisioned. If you do not have an SSH key in your IBM Cloud account, create one by following the provided instructions.[SSH Keys](https://cloud.ibm.com/docs/vpc?topic=vpc-ssh-keys)."
+          "description": "Provide the list of SSH key names configured in your IBM Cloud account to establish a connection to the Spectrum LSF bastion and login node. Make sure the SSH key exists in the same resource group and region where the cluster is being provisioned. To pass multiple SSH keys, use the format [\"key-name-1\", \"key-name-2\"]. If you don't have an SSH key in your IBM Cloud account, you can create one by following the provided .[SSH Keys](https://cloud.ibm.com/docs/vpc?topic=vpc-ssh-keys)."
         },
         {
           "name": "compute_ssh_keys",
           "value": "[\"Please fill here\"]",
           "type": "list(string)",
           "secure": false,
-          "description": "Provide the list of SSH key names configured in your IBM Cloud account to establish a connection to the Spectrum LSF cluster node. Ensure the SSH key is present in the same resource group and region where the cluster is being provisioned. If you do not have an SSH key in your IBM Cloud account, create one by following the provided instructions.[SSH Keys](https://cloud.ibm.com/docs/vpc?topic=vpc-ssh-keys)."
+          "description": "Provide the list of SSH key names configured in your IBM Cloud account to establish a connection to the Spectrum LSF cluster node. Ensure the SSH key is present in the same resource group and region where the cluster is being provisioned. To pass multiple SSH keys, use the format [\"key-name-1\", \"key-name-2\"]. If you do not have an SSH key in your IBM Cloud account, create one by following the provided instructions.[SSH Keys](https://cloud.ibm.com/docs/vpc?topic=vpc-ssh-keys)."
         },
         {
           "name": "remote_allowed_ips",
@@ -162,7 +155,7 @@
         },
         {
           "name": "dns_domain_name",
-          "value": "{compute= \"hpcaas.com\"}",
+          "value": "{compute= \"lsf.com\"}",
           "type": "object({compute = string})",
           "secure": false,
           "description": "IBM Cloud DNS Services domain name to be used for the IBM Cloud HPC cluster."
@@ -322,7 +315,7 @@
           "description": "Password for IBM Spectrum LSF Application Center GUI. Note: Password should be at least 8 characters, must have one number, one lowercase letter, one uppercase letter, and at least one special character."
         },
         {  "name": "app_center_high_availability",
-          "value": "true",
+          "value": "false",
           "type": "bool",
           "secure": false,
           "description": "Set to false to disable the IBM Spectrum LSF Application Center GUI High Availability (default: true)."
@@ -349,7 +342,7 @@
         },
         {
           "name": "ldap_basedns",
-          "value": "hpcaas.com",
+          "value": "lsf.com",
           "type": "string",
           "secure": false,
           "description": "The dns domain name is used for configuring the LDAP server. If an LDAP server is already in existence, ensure to provide the associated DNS domain name."
